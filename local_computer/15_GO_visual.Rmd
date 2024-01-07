@@ -1,0 +1,345 @@
+---
+title: "富集分析结果更多可视化"
+author: "陈同"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    code_fold: show
+---
+
+
+```{r, echo=F}
+knitr::opts_chunk$set( echo = TRUE, message=FALSE, warning=FALSE, fig.width=8 )
+```
+
+## 检查和安装加载包
+
+```{r}
+site = "https://mirrors.tuna.tsinghua.edu.cn/CRAN"
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager", repos = site)
+
+a = rownames(installed.packages())
+
+install_bioc <- c( "stringr", "GOplot")
+
+for (i in install_bioc) {
+  if (!i %in% a)
+    BiocManager::install(i, update = F)
+}
+
+```
+
+[赠你一只金色的眼 - 富集分析和表达数据可视化](https://blog.csdn.net/qazplm12_3/article/details/98041284)文章介绍了`GOplot`用于富集分析的可视化，这里我们用自己的数据实现一下。
+
+## 读入GOEAST富集结果
+
+用`GOEAST`返回的分析结果作为富集分析的结果，用`DESeq2`的差异分析结果作为基因表达输入数据。
+
+整理富集分析结果为`GOplot`可以识别的格式：	
+A data frame with columns for 'category', 'ID', 'term', adjusted p-value ('adj_pval') and 'genes'
+
+```{r}
+library(stringr)
+options(stringsAsFactors=FALSE)
+goeast <- read.table("15_enrichment/GOEAST/goeast.txt", header = T, 
+                     row.names=NULL, sep="\t")
+goeast <- goeast[,c(2,1,3,12,10)]
+colnames(goeast) <- c('category', 'ID', 'term', 'adj_pval', 'genes')
+# goeast$genes <- str_replace_all(goeast$genes, " // ", ", ")
+goeast$genes <- sapply(lapply(str_split(goeast$genes, " // "), unique), paste, collapse=", ")
+goeast$category <- str_replace_all(goeast$category, c("biological_process"="BP", "cellular_component"="CC", "molecular_function"="MF"))
+# head(goeast)
+```
+
+## 读入clusterProfiler富集结果
+
+整理`clusterProfiler`的结果为`GOplot`可以识别的格式：	
+A data frame with columns for 'category', 'ID', 'term', adjusted p-value ('adj_pval') and 'genes'. 
+
+```{r}
+bp <- read.table("15_enrichment/ehbio.DESeq2.all.DE.entrez.BP.all2.xls", header=T, row.names=NULL, sep="\t")
+bp$category <- "BP"
+bp <- bp[,c(11,1,2,6,8)]
+colnames(bp) <- c('category', 'ID', 'term', 'adj_pval', 'genes')
+bp$genes <- str_replace_all(bp$genes, "/", ", ")
+head(bp)
+
+cc <- read.table("15_enrichment/ehbio.DESeq2.all.DE.entrez.CC.all2.xls", header=T, row.names=NULL, sep="\t")
+cc$category <- "CC"
+cc <- cc[,c(11,1,2,6,8)]
+colnames(cc) <- c('category', 'ID', 'term', 'adj_pval', 'genes')
+cc$genes <- str_replace_all(cc$genes, "/", ", ")
+head(cc)
+
+goeast <- rbind(bp,cc)
+```
+
+整理表达数据为`GOplot`可以识别的格式：A data frame with columns for 'ID', 'logFC'.
+
+```{r}
+de_gene <- read.table("15_enrichment/ehbio.simplier.DESeq2.log2fc_ranked.symbol", header=T, row.names=NULL, sep="\t")
+colnames(de_gene) <- c('ID', 'logFC')
+head(de_gene)
+```
+
+使用`GOplot::cirlce_dat`函数整合为`GOplot`画图所需的数据格式。
+
+circ对象有八列数据，分别是
+
+`circ`对象有八列数据，分别是
+
+* category：BP（生物过程），CC（细胞组分）或 MF（分子功能）
+* ID: GO id(可选列, 想使用不基于GO id的功能分析工具，可以不选ID列；这里的ID也可以是KEGG ID)
+* term：GO通路
+* count：每个通路的基因个数
+* gene：基因名 
+* logFC：每个基因的logFC值
+* adj_pval：adjusted p值，adj_pval<0.05的通路被认为是显着富集的
+* zscore：zscore不是指统计学的标准化方式，而是一个很容易计算的值，来估计生物过程（/分子功能/细胞成分）更可能降低（负值）或增加（正值）。计算方法就是上调基因的数量减去下调基因的数量再除以每个通路基因数目的平方根
+
+```{r}
+# BiocManager::install("GOplot")
+suppressMessages(library(GOplot))
+circ <- circle_dat(goeast, de_gene)
+# 部分情况，功能注释和基因表达数据的symbol不匹配，会产生NA值
+# 可去除
+circ <- na.omit(circ)
+head(circ)
+```
+
+### GOBar–条形图
+
+最开始查看数据时，我们希望能从图中展示尽可能多的通路，并且也希望能找到有价值的通路，因此需要一些参数来评估重要性。条形图经常用于描述样本数据，故而我们可以用GOBar函数能快速创建一个好看的的条形图。
+
+首先直接生成一个简单的条形图，横轴是`GO Terms`，根据它们的`zscore`对条进行排序；纵轴是 `-log(adj p-value)`；颜色表示的是`zscore`，蓝色表示`z-score`是负值，在对应通路基因表达更可能下降，红色表示`z-score`是正值，在对应通路基因表达更可能升高。如果需要，可以通过将参数order.by.zscore设置为FALSE来更改顺序,在这种情况下条形图基于它们的显著性进行排序。
+
+```{r}
+# 生成简单的条形图
+GOBar(subset(circ, category == 'BP'))
+```
+
+
+
+```{r}
+#GOBar(subset(circ, category == 'BP',order.by.zscore=FALSE))
+```
+
+另外，通过更改display参数来根据通路的类别来绘制条形图。
+
+```{r, fig.height=6, fig.width=9}
+#根据通路的类别来绘制条形图
+GOBar(circ, display = 'multiple')
+```
+
+添加标题，并使用参数`zsc.col`更改`zscore`的颜色。
+
+```{r}
+# Facet the barplot, add a title and change the colour scale for the z-score
+GOBar(circ, display = 'multiple', title = 'Z-score coloured barplot', zsc.col = c('yellow', 'black', 'cyan'))
+```
+
+
+条形图是很常见的，也很容易理解，但我们可以使用气泡图来显示数据更多信息。
+
+### GOBubble–泡泡图
+
+横轴是`zscore`；纵轴是`-log(adj p-value)`，类似于条形图，越高表示富集越显着；圆的面积与对应通路的的基因数(`circ$count`)成正比；颜色对应于该通路所对应的类别，绿色生物过程，红色是细胞组分，蓝色是分子功能。可通过输入`?GOBubble`查看GOBubble函数的帮助页面来更改图片的所有参数。在默认情况下，每个圆标有对应的GO ID，右侧也会随之显示GO ID和GO term对应关系的表。可通过设置参数`table.legend`为`FALSE`来隐藏它。如果要显示通路描述，请设置参数ID为FALSE。不过由于空间有限和圆重叠，并非所有圆都被标记，只显示了`-log(adj p-value) > 2`(默认是5)的通路。
+
+```{r, fig.width=15, fig.height=10}
+# 生成泡泡图，并展示-log(adj p-value) > 2 的通路的GO ID
+
+GOBubble(circ, labels = 2)
+```
+
+
+若给泡泡图要添加标题，或指定圆圈的颜色并单独展示各类别的通路并更改展示的GO ID阈值，可添加以下参数：
+
+
+```{r, fig.width=13, fig.height=8}
+GOBubble(circ, title = 'Bubble plot', colour = c('orange', 
+  'darkred', 'gold'), display = 'multiple', labels = 2)
+```
+
+
+通过将参数bg.col设置为TRUE,为通路的类别的背景着色。
+
+
+```{r, fig.width=13, fig.height=8}
+GOBubble(circ, title = 'Bubble plot with background colour', display = 'multiple', bg.col = T, labels = 2)
+```
+
+
+新版本的包中包含一个新函数`reduce_overlap`，该函数可以减少冗余项的数量，即能删除基因重叠大于或等于设定阈值的所有通路，只将每组的一个通路作为代表保留，而不考虑GO所有通路的展示。通过减少冗余项的数量，图的可读性（如气泡图）显着改善。
+
+
+```{r, fig.width=13, fig.height=8}
+# reduce_overlap，参数设置为0.75
+reduced_circ <- reduce_overlap(circ, overlap = 0.75)
+GOBubble(reduced_circ, labels = 2)
+```
+
+
+### GOCircle–圈图展示基因功能富集分析结果
+
+虽然展示所有信息的图有助于我们发现哪些通路最有意义，不过实际情况还是取决于你想要用数据确认的假设和想法，最重要的通路也不一定是你感兴趣的。因此，在手动选择一组有价值的通路（`EC$process`）后，我们需要一张图为我们展示此组特定通路的更详细的信息。不过通过呈现这些图能得出一个问题：有时很难解释`zscore`提供的信息。毕竟这个计算方法并不通用，如上所示，它仅仅是上调基因的数量减去下调基因的数量除以每个通路基因数目的平方根，用`GOCircle`得出的图也强调了这一事实。
+
+圈图外圈的圆用散点展示了每个通路的基因的logFC值。红色圆圈表示上调和蓝色表示下调。可以使用参数`lfc.col`更改颜色。这也解释了为什么在某些情况下，非常重要的通路具有接近零的zscore。zscore为零并不意味着该通路不重要。它只是表明zscore是粗略的衡量标准，因为显然zscore也没有考虑生物过程中单个基因的功能水平和激活依赖性。
+
+```{r, fig.width=12, fig.height=8}
+GOCircle(circ)
+```
+
+
+`nsub`参数可是设置数字或字符向量。如果它是字符向量，则它包含要显示的GO ID或通路；
+
+```{r, fig.width=12, fig.height=8}
+# 生成特定通路的圈图
+IDs <- c('GO:0071384', 'GO:0071385',
+         'GO:0098644', 'GO:0010273')
+GOCircle(circ, nsub = IDs)
+```
+
+
+如果nsub是数字向量，则该数字定义显示的个数。它从输入数据帧的第一行开始。这种可视化仅适用于较小的数据。最大通路数默认为12。虽然通路数量减少，但显示的信息量会增加。
+
+```{r, fig.width=12, fig.height=8}
+# 圈图展示数据前十个通路
+GOCircle(circ, nsub = 10)
+```
+
+### GOChord–圈图展示基因和通路之间的关系
+
+GOChord能展示了所选基因和通路之间的关系和基因的logFC。首先需要输入一个矩阵，可以自己构建`0-1`矩阵，也可以使用函数`chord_dat`构建。该函数有三个参数：data，genes和process，其中最后两个参数至少要有一个参数。然后函数`circle_dat`将表达数据与功能分析的结果相结合。
+
+条形图和气泡图可以让您对数据有第一印象，现在，可以选择了一些我们认为有价值的基因和通路,尽管GOCircle添加了一个层来显示基因在通路的表达值，但它缺乏单个基因和多个通路之间关系的信息。要弄清楚某些基因是否与多个过程相关联并不容易。GOChord就弥补了GOCircle的缺陷。生成的数据行是基因，列是通路，“0”表示该基因未被分配到该通路，“1”正相反。
+
+```{r}
+library(tidyverse)
+# 找到感兴趣的的基因
+
+target_gene <- c("MT2A", "MT1X", "MT1E", "COL7A1", "COL4A1", "COL4A4", "COL11A1", "COL4A3")
+
+target_gene <- de_gene %>% filter(ID %in% target_gene)
+
+head(target_gene)
+
+# 获得感兴趣基因的通路
+target_process <- c("detoxification of copper ion", 
+                    "detoxification of inorganic compound", 
+                    "complex of collagen trimers")
+
+# 使用chord_dat构建矩阵
+chord <- chord_dat(circ, target_gene, target_process)
+head(chord)
+
+```
+
+示例中我们传递了两个参数,若只指定genes参数，则结果是所选基因列表和具有至少一个指定基因的所有过程构建`0-1`矩阵；若只指定了`process`参数，则结果是所有基因生成`0-1`矩阵，这些基因分配给列表中的至少一个过程。要注意只指定genes和process参数可能会导致0-1矩阵很大，从而导致可视化结果混乱。
+
+
+```{r}
+chord_genes <- chord_dat(data = circ, genes = target_gene)
+head(chord_genes, n=2)
+```
+
+该图表是为了展示较小的高维数据的子集。主要可以调整两个参数：`gene.order`和`nlfc`。genes参数可指定为’logFC’，‘alphabetical’，‘none’。实际上，我们一般指定genes参数为logFC；nlfc参数是这个函数最重要的参数之一，因为它能处理每个基因有0个或多个logFC值怎么在矩阵呈现。故而我们应该指定参数来避免错误。
+
+例如，如果有一个没logFC值的矩阵，则必须设置`nlfc=0`；或者在多个条件或批次对基因进行差异表达分析，这时每个基因包含多个logFC值，需要设置nlfc=logFC列数。默认值为“1”，因为认为大多数时候每个基因只有一个logFC值。用space参数定义表示logFC的彩色矩形之间的空间。gene.size参数规定基因名字字体大小，gene.space规定基因名字间的空间大小。
+
+```{r, fig.width=13, fig.height=10}
+chord <- chord_dat(data = circ, genes = target_gene, target_process)
+
+# 若某个通路不包含给定基因，则移除
+chord <- chord[,colSums(abs(chord))!=0]
+
+GOChord(chord, space = 0.02, gene.order = 'logFC', 
+        gene.space = 0.25, gene.size = 2)
+
+```
+
+
+可根据logFC值设定`gene.order=‘logFC’`，对基因按照logFC值进行排序。有时图片会变得有点拥挤，可以通过使用limit参数自动执行减少显示的基因或通路的数量。Limit是具有两个截止值的向量（默认值是c（0,0））。第一个值规定了基因必须分配的最少通路个数。第二个值确定分配给通路的基因个数。
+
+```{r, fig.width=13, fig.height=13}
+# 仅显示分配给至少三个通路的基因
+GOChord(chord, limit = c(1, 0), gene.order = 'logFC')
+
+## Warning: Using size for a discrete variable is not advised.
+
+## Warning: Removed 7 rows containing missing values (geom_point).
+```
+
+
+### GOHeat–热图展示基因和通路
+
+GOHeat函数能用热图展示基因和通路之间的关系，类似于GOChord。横向展示生物过程，纵向展示基因。每列被分成小的矩形，颜色一般取决于logFC值。另外具有富集到相似功能通路的基因被聚类。热图颜色选择有两种模式，具体取决于nlfc参数。如果nlfc = 0，则颜色为每个基因所富集到的通路个数。详见例子：
+
+```{r}
+# First, we use the chord object without logFC column to create the heatmap
+GOHeat(subset(chord, select=-c(logFC)), nlfc = 0)
+```
+
+
+
+```{r}
+GOHeat(chord[,-8])
+```
+
+在nlfc = 1的情况下，颜色对应于基因的logFC
+
+```{r}
+GOHeat(chord, nlfc = 1, fill.col = c('red', 'yellow', 'green'))
+```
+
+
+### GOCluster–Golden eye
+
+GOCluster功能背后的想法是尽可能多地显示信息。这是一个例子：
+
+```{r, fig.width=13, fig.height=10}
+GOCluster(circ, target_process, clust.by = 'logFC', term.width = 2)
+
+## Warning: Using size for a discrete variable is not advised.
+
+## Warning: Removed 7 rows containing missing values (geom_point).
+```
+
+
+层级聚类是一种流行的基因表达无监督聚类分析方法，可确保无偏差的将基因按表达模式组合在一起，因此聚在一起的类可能包含多组共调节或功能相关的基因。GOCluster使用核心R中的`hclust`方法执行基因表达谱的层级聚类。如果要更改距离度量或聚类算法，请分别使用参数metric和clust，得到的树形图可在ggdendro的帮助下进行转换，并能用ggplot2进行可视化。选择圆形布局，因为它不仅有效而且视觉上吸引人。树形图旁边的第一个圆环代表基因的logFC，它实际上是聚类树的叶子。如果您对多个对比感兴趣，可以修改nlfc参数，默认情况下，它设置为“1”，因此只绘制一个环。logFC值使用用户可定义的色标（lfc.col）进行颜色编码；下一个圆环表示分配给基因的通路。为了好看，对通路数目进行了削减，通路的颜色可以使用参数term.col来。依然可以使用`?GOCluster`来查看如何更改参数。这个函数最重要的参数是clust.by，可以指定它用基因表达模式（‘logFC’，如上图）或功能类别（‘terms’）进行聚类。
+
+```{r, fig.width=13, fig.height=10}
+GOCluster(circ, target_process, clust.by = 'term', lfc.col = c('darkgoldenrod1', 'black', 'cyan1'))
+
+## Warning: Using size for a discrete variable is not advised.
+
+## Warning: Removed 7 rows containing missing values (geom_point).
+```
+
+
+### GOVenn–维恩图
+
+维恩图可用于检测各种差异表达基因列表之间的关系，或探索功能分析中多个通路基因的交集。维恩图不仅显示重叠基因的数量，还显示有关基因表达模式的信息（通常是上调，通常是下调或反调节）。目前，最多三个数据集作为输入。输入数据至少包含两列：一列用于基因名称，一列用于logFC值。
+
+```{r}
+l1 <- subset(circ, term == "detoxification of copper ion", c(genes,logFC))
+l2 <- subset(circ, term == "detoxification of inorganic compound", c(genes,logFC))
+l3 <- subset(circ, term == "complex of collagen trimers", c(genes,logFC))
+GOVenn(l1,l2,l3, label = c("detoxification of copper ion",
+                           "detoxification of inorganic compound",
+                           "complex of collagen trimers"))
+```
+
+
+例如，心脏发育和组织形态发生有22个基因，12个是上调的，10个是下调的。需要注意的重要一点是，饼图不显示冗余信息。因此，如果比较三个数据集，则所有数据集共有的基因（中间的饼图）不包含在其他饼图中。可使用此工具的shinyapp https://wwalter.shinyapps.io/Venn/, Web工具更具交互性，圆与数据集的基因数量成面积比例，并且可以使用滑块移动小饼图,并且具有GOVenn功能的所有选项来改变图的布局，也可以下载图片和基因列表。
+
+

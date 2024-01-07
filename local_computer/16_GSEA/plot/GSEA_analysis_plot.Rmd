@@ -1,0 +1,376 @@
+---
+title: "GSEA plot"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## R绘制Broad GSEA分析结果
+
+Broad的输出结果存储在`test/ehbio.Gsea.1541951132771` (命名规律为自己在运行GSEA时写的输出名字加随机数)目录下，点击`index.html`可浏览，`edb`目录下有所有的文本格式的分析结果和Rank值。这些数据将用来绘制GSEA plot。
+
+
+定义了导入GSEA数据的函数，需要提供GSEA输出结果目录
+
+
+```{r}
+# 这句话定义了导入GSEA数据的函数，需要提供GSEA输出结果目录
+# 不需要修改
+
+importGSEA <- function (GSEA_output_dir) {
+  # 这个目录需要修改，其它都不用动
+  # GSEA_output_dir <- "test/ehbio.Gsea.1541951132771"
+  edb = file.path(GSEA_output_dir, "edb")
+  xml_file <- file.path(edb, "results.edb")
+  rank_file <- file.path(edb, list.files(edb,"\\.rnk$")[1])
+  
+  suppressMessages(require(xml2))
+  suppressMessages(require(dplyr))
+  suppressMessages(library(stringr))
+  data <- read_xml(xml_file)
+  recs <- xml_find_all(data, "//DTG")
+  attrs = recs %>% xml_attrs()
+  gseaEnrichTable = as.data.frame(do.call(rbind, attrs))
+  gseaEnrichTable$GENESET <- stringr::str_split(gseaEnrichTable$GENESET, "#", simplify=T)[,2]
+  gseaEnrichTable <- gseaEnrichTable[,-(1:2)]
+  
+  gseaEnrichTable[,c(2,3,4,5,6,10,11)] <- lapply(gseaEnrichTable[,c(2,3,4,5,6,10,11)], function(x) {
+        if(is.factor(x)) as.numeric(as.character(x)) else x })
+  gseaEnrichTable <- gseaEnrichTable[order(abs(gseaEnrichTable$NES), decreasing = T),]
+  
+  rank <- read.table(rank_file, row.names=NULL, sep="\t", header=F, quote="")
+  colnames(rank) <- c("Gene","Rank")
+  rank <- data.frame(x=1:nrow(rank), rank)
+  rank[,c("position","ymin","ymax","ES")] = 0
+  
+  mergeRank <- function(rank, enrichset) {
+    rank2 <- rank
+    hitIndices <- as.numeric(str_split(enrichset["HIT_INDICES"]," ",simplify=T))
+    hitIndices <- hitIndices + 1
+    
+    esProfile <- as.numeric(str_split(enrichset["ES_PROFILE"]," ",simplify=T))
+    
+    gsea_result1 <- data.frame(hitIndices=hitIndices, esProfile=esProfile)
+    
+  
+    rank2$position[gsea_result1$hitIndices] = 1
+    
+    # Add ES
+    rank2$ES <- gsea_result1[match(rank2$x, gsea_result1$hitIndices), 2]
+    
+    # 按道理应该从头计算，这里先替换下
+    #if(is.na(rank2$ES[1])){
+    #  rank2$ES[1] = 0
+    #}
+  
+    # 按道理应该从头计算，这里先替换下
+    #if(is.na(rank2$ES[nrow(rank2)])){
+    #  rank2$ES[nrow(rank2)] = as.numeric(as.character(enrichset["RANK_SCORE_AT_ES"])) / 3
+    #}
+    
+    # Add Y
+    rank2[rank2$position==1,"ymin"] <- -0.2
+    rank2[rank2$position==1,"ymax"] <- 0.2
+    rank2$Description <- enrichset["GENESET"]
+    rank2
+  }
+  
+  mergedResult <- do.call(rbind, apply(gseaEnrichTable, 1, mergeRank, rank=rank))
+  gseaEnrichObject <- list(GSEAprofile=mergedResult, gseaEnrichTable = gseaEnrichTable)
+  return(gseaEnrichObject)
+}
+```
+
+定义绘图函数
+
+
+```{r}
+# 定义绘图函数
+# 不需要修改
+# 代码主要来源于 enrichplot包，稍微做了些修改，适应外部导入数据
+library(ggplot2)
+library(RColorBrewer)
+library(gridExtra)
+
+tableGrob3 <- function(d, p = NULL, base_size=10) {
+    # from https://github.com/GuangchuangYu/enrichplot/blob/684b026ef7727940b0d4350548c5c8ae661c11c5/R/ggtable.R
+    # theme from https://stackoverflow.com/questions/31776557/how-to-adjust-the-font-size-of-tablegrob/31776800
+    d <- d[order(rownames(d)),]
+    changeTheme <- gridExtra::ttheme_default(
+      core = list(fg_params=list(fontsize = base_size*0.7)),
+      colhead = list(fg_params=list(fontsize=base_size*0.7)),
+      rowhead = list(fg_params=list(fontsize=base_size*0.7)))
+    tp <- gridExtra::tableGrob(d, theme=changeTheme)
+    if (is.null(p)) {
+        return(tp)
+    }
+    pcol <- unique(ggplot_build(p)$data[[1]][["colour"]])
+    j <- which(tp$layout$name == "rowhead-fg")
+
+    for (i in seq_along(pcol)) {
+        tp$grobs[j][[i+1]][["gp"]] = grid::gpar(col = pcol[i], fontsize=base_size*0.7)
+    }
+    return(tp)
+}
+
+gsInfo3 <- function(x, gseaEnrichTable, geneSetID){
+  # Get term name if indexes give
+  # Index sort by absolute NES
+  if (is.numeric(geneSetID)) {
+    geneSetID <- gseaEnrichTable[geneSetID, "GENESET"]
+  }
+  # 返回数据子集
+  return(x[x$Description==geneSetID,])
+}
+
+statInfo <- function(gseaEnrichTable, geneSetID){
+   if (is.numeric(geneSetID)) {
+      geneSetID <- gseaEnrichTable[geneSetID, "GENESET"]
+    }
+    return(gseaEnrichTable[gseaEnrichTable$GENESET==geneSetID, c("GENESET", "NES","NP","FDR")])
+}
+
+gseaPlot3 <- function(GSEAenrichObject, geneSetID, title = "", 
+                     color="green", base_size = 10, rel_heights=c(1.5, .5, 1), 
+                     subplots = 1:3, pvalue_table = FALSE, ES_geom="line") 
+{
+
+  # Code from https://github.com/GuangchuangYu/enrichplot/blob/master/R/gseaplot.R
+  # With modification
+  # 原脚本功能更强大
+  
+  x <- GSEAenrichObject$GSEAprofile
+  gseaEnrichTable <- GSEAenrichObject$gseaEnrichTable
+  
+  ES_geom <- match.arg(ES_geom, c("line", "dot"))
+
+  if (length(geneSetID) == 1) {
+    gsdata <- gsInfo3(x, gseaEnrichTable, geneSetID)
+  } else {
+    gsdata <- do.call(rbind, lapply(geneSetID, gsInfo3, x=x, gseaEnrichTable = gseaEnrichTable))
+  }
+  
+  p <- ggplot(gsdata, aes_(x = ~x)) + xlab(NULL) +
+    theme_classic(base_size) +
+    theme(panel.grid.major = element_line(colour = "grey92"),
+          panel.grid.minor = element_line(colour = "grey92"),
+          panel.grid.major.y = element_blank(),
+          panel.grid.minor.y = element_blank()) +
+    scale_x_continuous(expand=c(0,0))
+  
+  # Running ES line or point
+  # Different enriched terms plot separately
+  if (ES_geom == "line") {
+    es_layer <- geom_line(aes_(y = ~ES, color= ~Description), size=1, 
+                          data = subset(gsdata, position == 1))
+  } else {
+    es_layer <- geom_point(aes_(y = ~ES, color= ~Description), size=1, 
+                           data = subset(gsdata, position == 1))
+  }
+
+  p.res <- p + es_layer +
+    theme(legend.position = c(.75, .8), legend.title = element_blank(),
+          legend.background = element_rect(fill = "transparent"))
+  
+  p.res <- p.res + ylab("Running Enrichment Score") +
+    theme(axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.line.x=element_blank(),
+          plot.margin=margin(t=.2, r = .2, b=0, l=.2, unit="cm"))
+  
+  # Generate data for exist line or position line
+  i <- 0
+  for (term in unique(gsdata$Description)) {
+    idx <- which(gsdata$ymin != 0 & gsdata$Description == term)
+    gsdata[idx, "ymin"] <- i
+    gsdata[idx, "ymax"] <- i + 1
+    i <- i + 1
+  }
+  
+  # Plot exist line or position line
+  p2 <- ggplot(gsdata, aes_(x = ~x)) +
+    geom_linerange(aes_(ymin=~ymin, ymax=~ymax, color=~Description)) +
+    xlab(NULL) + ylab(NULL) + theme_classic(base_size) +
+    theme(legend.position = "none",
+          plot.margin = margin(t=-.1, b=0,unit="cm"),
+          axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          axis.line.x = element_blank()) +
+    scale_x_continuous(expand=c(0,0)) +
+    scale_y_continuous(expand=c(0,0))
+  
+  
+  if (length(geneSetID) == 1) {
+    # 这部分没找到GSEA对应的解释，这个处理得到的结果跟GSEA的不完全一致，做个参考
+    v <- seq(1, sum(gsdata$position), length.out=9)
+    inv <- findInterval(rev(cumsum(gsdata$position)), v)
+    if (min(inv) == 0) inv <- inv + 1
+    
+    col=c(rev(brewer.pal(5, "Blues")), brewer.pal(5, "Reds"))
+    
+    ymin <- min(p2$data$ymin)
+    yy <- max(p2$data$ymax - p2$data$ymin) * .3
+    xmin <- which(!duplicated(inv))
+    xmax <- xmin + as.numeric(table(inv)[unique(inv)])
+    d <- data.frame(ymin = ymin, ymax = yy,
+                    xmin = xmin,
+                    xmax = xmax,
+                    col = col[unique(inv)])
+    p2 <- p2 + geom_rect(
+      aes_(xmin=~xmin,
+           xmax=~xmax,
+           ymin=~ymin,
+           ymax=~ymax,
+           fill=~I(col)),
+      data=d,
+      alpha=.9,
+      inherit.aes=FALSE)
+  } else {
+    # 如果同时绘制多个集合，rank值做个热图，美观下，不过下面展示重复了
+    ymin <- min(p2$data$ymin)-0.3
+    yy <- max(p2$data$ymax - p2$data$ymin) * .4
+    
+    p2 <- p2 +
+    geom_rect(aes(xmin=x-.5, xmax=x+.5, fill=Rank),
+              ymin=ymin, ymax = ymin+yy, alpha=.5) +
+    theme(legend.position="none") +
+    scale_fill_gradient2(low="blue", mid="white", high="red", midpoint=0)
+  }
+  
+  # Rank value
+  df2 <- p$data #data.frame(x = which(p$data$position == 1))
+  df2$y <- p$data$Rank[df2$x]
+  df2$y[df2$y==0] = 0.0001
+  p.pos <- p + geom_segment(data=df2, aes_(x=~x, xend=~x, y=~y, yend=0), color="grey")
+  p.pos <- p.pos + ylab("Ranked list metric") +
+    xlab("Rank in Ordered Dataset") +
+    theme(plot.margin=margin(t = -.1, r = .2, b=.2, l=.2, unit="cm"))
+  
+ 
+  if (!is.null(title) && !is.na(title) && title != "")
+    p.res <- p.res + ggtitle(title)
+  
+  if (length(color) == length(geneSetID)) {
+    p.res <- p.res + scale_color_manual(values=color)
+    if (length(color) == 1) {
+      p.res <- p.res + theme(legend.position = "none")
+      p2 <- p2 + scale_color_manual(values = "black")
+    } else {
+      p2 <- p2 + scale_color_manual(values = color)
+    }
+  }
+  
+  if (pvalue_table) {
+    if (length(geneSetID) == 1) {
+      pd <- statInfo(gseaEnrichTable, geneSetID)
+    } else {
+      pd <- do.call(rbind, lapply(geneSetID, statInfo, gseaEnrichTable = gseaEnrichTable))
+    }
+    
+    pd <- pd[order(pd[,1], decreasing=FALSE),]
+    rownames(pd) <- pd$GENESET
+    pd <- pd[,-1]
+    
+    pd <- round(pd, 4)
+    
+    tp <- tableGrob3(pd, p.res, base_size)
+    
+    p.res <- p.res + theme(legend.position = "none") +
+      annotation_custom(tp,
+                        xmin = quantile(p.res$data$x, .4),
+                        xmax = quantile(p.res$data$x, .9),
+                        ymin = quantile(p.res$data$ES, .75, na.rm=T),
+                        ymax = quantile(p.res$data$ES, .9, na.rm=T))
+  }
+  
+  
+  plotlist <- list(p.res, p2, p.pos)[subplots]
+  n <- length(plotlist)
+  plotlist[[n]] <- plotlist[[n]] +
+    theme(axis.line.x = element_line(),
+          axis.ticks.x=element_line(),
+          axis.text.x = element_text())
+  
+  if (length(subplots) == 1)
+    return(plotlist[[1]] + theme(plot.margin=margin(t=.2, r = .2, b=.2, l=.2, unit="cm")))
+  
+  
+  if (length(rel_heights) > length(subplots))
+    rel_heights <- rel_heights[subplots]
+  
+  cowplot::plot_grid(plotlist = plotlist, ncol=1, align="v", rel_heights=rel_heights)
+}
+```
+
+## 导入数据
+
+```{r}
+suppressMessages(require(xml2))
+suppressMessages(require(dplyr))
+suppressMessages(library(stringr))
+gseaEnrichObject  <- importGSEA("test/ehbio.Gsea.1541951132771")
+#gseaEnrichObject  <- importGSEA("test/ehbio.tm..Gsea.1542296381427")
+```
+
+```{r, fig.width=12}
+library(ggplot2)
+library(RColorBrewer)
+gseaPlot3(gseaEnrichObject, 1, pvalue_table = T)
+```
+
+```{r, fig.width=12}
+gseaPlot3(gseaEnrichObject, 1:3, pvalue_table = T)
+```
+
+
+## GSEA 时间序列数据分析
+
+生成注释gmt文件
+
+```{bash}
+wget https://www.arabidopsis.org/download_files/GO_and_PO_Annotations/Gene_Ontology_Annotations/ATH_GO_GOSLIM.txt
+# 提取biological process分类
+# 注意按照自己的文件筛选合适的列，修改下面的$8,$1,$5,$6.
+awk 'BEGIN{OFS=FS="\t"}{if($8=="P") print $1,$5,$6}' ATH_GO_GOSLIM.txt | sort -u | awk 'BEGIN{OFS=FS="\t"}{anno=$2"\t"$3; a[anno]=a[anno]==""?$1:a[anno]"\t"$1}END{for(i in a) print i,a[i]}'  >  ATH_GO_GOSLIM_LocusName_bp_useme.gmt
+```
+
+## GSEA in R包clusterprofiler
+
+gmt文件预处理,整理成clusterprofiler需要的格式
+
+```{bash}
+awk 'BEGIN{OFS=FS="\t"}{if(FNR==1) print "ont\tgene"; for(i=3;i<=NF;i++) print $1,$i;}' h.all.v6.2.symbols.gmt >h.all.v6.2.symbols.gmt.forGO
+
+head h.all.v6.2.symbols.gmt.forGO
+```
+
+输入文件初始化
+
+```{r}
+preranked_file = "test/ehbio.Gsea.1541951132771/edb/ehbio_salmon.DESeq2.ehbio_salmon.DESeq2.rnk"
+gmt = "h.all.v6.2.symbols.gmt.forGO" 
+```
+
+```{r}
+suppressMessages(library(clusterProfiler))
+
+rank_list <- read.table(preranked_file, row.names=NULL, sep="\t", header=F, quote="")
+
+self_anno <- read.table(gmt, header=T, sep="\t", quote="", row.names=NULL)
+
+geneL = rank_list[,2]
+names(geneL) <- rank_list[,1]
+
+self_gsea <- GSEA(geneL, TERM2GENE=self_anno, pvalueCutoff = 0.05)
+```
+
+enrichPlot绘图
+
+```{r}
+enrichplot::gseaplot2(self_gsea, "HALLMARK_ESTROGEN_RESPONSE_EARLY")
+```
+
+

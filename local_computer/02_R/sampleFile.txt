@@ -1,0 +1,7 @@
+samp	Grp
+WT1	WT
+WT2	WT
+WT3	WT
+KO1	KO
+KO2	KO
+KO3	KO
