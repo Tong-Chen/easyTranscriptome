@@ -1,0 +1,736 @@
+# Neural Network  {neuralnetwork}
+
+
+## 神经网络基本概念理解 {#neuralnetworkbasicconcept}
+
+> 本文起源于对[神经网络15分钟快速入门](https://mp.weixin.qq.com/s/EJNwMWOripas1UNSEeRuRQ)系列教程的学习和理解过程，综合网络上其它资料(后面有引文)进一步加深理解的基础上做了重整理。使用案例还是这篇文章的案例，在这里对作者表示感谢。
+
+
+## 用 Python 实现一个单层神经网络 {#pythonnnetwork}
+
+正向传播函数 (`affine_forward`)和反向传播函数 (`affine_backward`)是2个公用函数，直接定义在了最前面。
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+from math import ceil
+
+
+def affine_forward(x, weight, bias):
+    """
+    x:       输入数据2维数组，形状为 (N, d)  
+             N 为总的输入数据的条数
+             d 为每条数据的维度，如果输入数据本身是多维的，需要先展平。
+             
+             这一步操作在神经网络训练的函数中会做数据的展平，输入给该正向传播函数时已经做过处理了。
+             
+             假如我们输入的是一个 4 x 2 的二维矩阵，
+                                      [[3,2], 
+                                       [-2,1], 
+                                       [-1,2], 
+                                       [2,-1]]
+             则 N = 4，表示有 4 条数据；
+                d = 2，表示该维向量的长度为 2。
+             
+    weight:  神经网络过程需要计算的权重值，初始时可随机初始化; 
+             其维度为其连接的上下两层神经网络中上层网络中神经元的个数或输入数据的维度和神经元的数目，
+             其形状定义为（D, M)
+             
+    bias:    偏置单元或偏置项，函数的截距，类比于线性函数中y = wx + b 的 b
+             其形状定义为 (1, M)
+    """
+    
+    # 对应公式 H = X * W1 + b1 
+    out = np.dot(x, weight) + bias
+    return out
+    
+
+def affine_backward(dout, cache):
+    """
+    反向传递，从后面的节点向前面的节点反推，然后优化每两层神经元层之间的权重 w 和偏差 b
+    
+    dout：该层的输出结果
+    cache:  该层输入的 x, w, b
+    """
+    
+    x, w, b = cache
+    dx, dw, db = None, None, None
+    
+    # dout的维度是 (N,M), w的维度是（D,M), w.T为 w 的转置，维度为 (M,D)
+    # 计算出 dx 的维度是 (N,D)
+    # 根据当前节点的值dout和到达这一节点的权重，推测当前结果相对于输入值的偏导数
+    # 计算出的 dx 反应了改变 x 的值对结果的影响的幅度和方向
+    dx = np.dot(dout, w.T)
+    
+    # x的维度是（N,D), x.T的转置为(D,N), dout的维度是（N,M) 
+    # 计算出的 dw 维度是（D,M)
+    # 根据当前节点的值dout和到达这一节点的输入值，推测当前结果相对于权重的偏导数
+    # 计算出的 dw 反应了改变 w的值对结果的影响的幅度和方向
+    dw = np.dot(x.T, dout)
+    
+    # 因为 bias 只是加和，没有涉及到乘数运算
+    # 输出结果相对于 bias 的偏导数就是输出结果自身，为了保持维度一致，做了按第一维度求和
+    # db 维度是（1,M)
+    db = np.sum(dout, axis=0, keepdims=True)
+    
+    return dx, dw, db
+```
+
+损失值的计算和图形绘制。
+
+
+```{python}
+def plot_loss(epoch, lossL, subplot=3, subplot_size = 6, picture_name="loss.png"):
+    """
+    eposh: 训练次数
+    lossL: 每次训练计算出的 loss 值
+    subplot: 把训练次数分成多少段分别用子图展示，以更好呈现训练过程中 loss 值的变化
+    subplot_size: 设置每个子图的大小
+    picture_name： 输出图片的名字
+    """
+
+    segment = ceil(epoch / subplot)
+
+    # 定义两个向量
+    x = np.arange(epoch)
+    y1 = lossL
+    
+    # 计算损失值的变化
+    lossDiff = np.diff(lossL)
+    y2 = np.concatenate(([lossDiff[0]], lossDiff))
+
+    plt.figure(figsize=((subplot+1)*subplot_size, 2*subplot_size))
+
+    plt_row_columns = (2,subplot+1)
+
+
+    def plot_line(ax, x, y, ylabel):
+        # 绘制折线图
+        ax.plot(x, y)
+        # 添加标题和坐标轴标签
+        ax.set_title('')
+        ax.set_xlabel('Training epoch')
+        ax.set_ylabel(ylabel)
+
+
+    for i in range(subplot+1):
+        ax = plt.subplot2grid(plt_row_columns, (0, i), rowspan=1, colspan=1)
+        if i == 0:
+            plot_line(ax, x, y1, "Loss")
+        else:
+            plot_line(ax, x[(i-1)*segment:i*segment], y1[(i-1)*segment:i*segment], "Loss")
+
+    for i in range(subplot+1):
+        ax = plt.subplot2grid(plt_row_columns, (1, i), rowspan=1, colspan=1)
+        if i == 0:
+            plot_line(ax, x, y2, "Loss change gratidue")
+        else:
+            plot_line(ax, x[(i-1)*segment:i*segment], y2[(i-1)*segment:i*segment], "Loss change gratidue")
+
+
+    plt.tight_layout()
+    plt.savefig(picture_name, dpi=300)
+    # 显示图形
+    plt.show()
+#---end plot loss----------
+```
+
+单层神经网络训练的主函数
+
+```{python}
+def neural_network(X, y_label, hidden_dim=50, reg=0.001, epsilon=0.001,
+                  epoch=10000, random_seed=1):
+    """
+    X: 用于训练的数据, 这个示例数据很少，只有 8 条
+       X = np.array([[3,2], 
+                  [-2,1], 
+                  [-1,-2], 
+                  [2,-1],
+                  [-1,5],
+                  [10,-10],
+                  [20,30],
+                  [-5,-20]])
+        输入数据为多维数组，形状为 (N, d)  
+        N 为总的输入数据的条数
+        d 为每条数据的维度。
+             
+        假如我们输入的是一个三维矩阵，[[[3,2],  [2,1,0]], 
+                                       [[-2,1], [1,2,0]], 
+                                       [[-1,2], [0,1,0]], 
+                                       [[2,-1], [2,3,0]]]
+             则 N = 4，表示有 4 条数据；
+                k = 2，表示每条数据是一个二维向量
+                d_k 也就是 d_1 为 2，表示该维向量的长度为 2
+                           d_2 为 3，表示该维向量的长度为 3
+              在程序里这个矩阵会被展开为一个 4 * 5 的二维矩阵
+    
+    y_label: 训练数据的分类标签，对应于 4 个象限
+             这里不管是什么样的分类标签，比如normal, disease 或者 class I, II, III, IV
+             都需要转成数字表示，每个分类标签标记为一个数字
+             具体哪个分类标签是哪个数字没关系，只要能对回去就行，但为了简单需要是从 0 开始的连续数字
+             这样后面在提取分类到对应标签的概率时更方便。
+             y_label = np.array([0,1,2,3,1,3,0,2])
+    
+    hidden_dim: 隐藏层的维度(神经元的数量)，是一个可自己调节的参数
+   
+    reg: 正则化强度，是一个可自己调节的参数
+    
+    epsilon: 梯度下降的学习率，是一个可自己调节的参数
+ 
+    epoch: 把数据集扔进网络计算的次数，是一个可自己调节的参数
+     
+    """
+    
+    
+    # 随机数发生器的种子，主要用于保证后面生成的随机数是可重复的
+    np.random.seed(random_seed)
+    
+    N = X.shape[0]
+    
+    # 转换输入数据为 1 个二维矩阵，第一维是输入数据的条数，第二维是原始数据各个维度摊平
+    # 因为在线性代数中矩阵相乘，我们处理的都是二维矩阵
+    # 如果 x 是 [ [[2,3],[4,5]], [[-1,-2],[-3,-4]] ], 
+    # x_row就是 [[2,3,4,5], [-1,-2,-3,-4]]
+    # x_row = x.reshape(N, -1)
+    # 输入数据后面会被拉平，单条数据自身维度的求和就是输入维度
+    # input_dim = sum(X.shape[1:])
+    X = X.reshape(N, -1)
+    input_dim = X.shape[1]
+    
+    # 输出参数的维度，对应于分类标签数
+    num_classes = len(np.unique(y_label))
+    
+    # 随机初始化 w1,w2,b1,b2
+    # 这个网络，有一个输入层、一个隐藏层、一个输出层，需要 2 套权重矩阵和偏置项
+    W1 = np.random.randn(input_dim, hidden_dim)
+    W2 = np.random.randn(hidden_dim, num_classes)
+    b1 = np.zeros((1, hidden_dim))
+    b2 = np.zeros((1, num_classes))
+    
+    if 0:
+        print("W1", W1)
+        print("b1", b1)
+        print("W2", W2)
+        print("b2", b2)
+    
+    lossL = []
+    
+    for i in range(epoch):
+        # 第一层前向传播
+        first_layer_cache = (X, W1, b1)
+        H1 = affine_forward(*first_layer_cache)
+        
+        if i == -1 and debug:
+            print("H1", H1)
+        
+        # 对 H1 的结果经过RELU激活函数重新计算
+        H1 = np.maximum(0, H1)
+        
+        if i == -1 and debug:
+                print("H1", H1)
+        relu_cache1 = H1
+        
+        # 如果有其它隐藏层重复上面 3 行代码，不含注释
+        # 后面这里改成循环形式
+        
+        # 基于最后一层隐藏层的结果计算输出层
+        final_layer_cache = (H1, W2, b2)
+        Y = affine_forward(*final_layer_cache)
+        
+        if i == -1 and debug:
+            print("Y", Y)
+        
+        # Y 是否需要 RELU 激活？
+        
+        # 对输出结果正则化，计算每个条目数据分配到各个数据标签的概率
+        # 这也称为 Softmax 层
+        # Softmax 层的计算时为了规避数据溢出，原始值都减去了本行 (axis=1)最大值
+        # 具体看上面理论部分
+        probs = np.exp(Y - np.max(Y, axis=1, keepdims=True))
+        probs /= np.sum(probs, axis=1, keepdims=True)
+        
+        # 计算交叉熵损失
+        N = probs.shape[0]
+        # 输出各条目数据预测正确的概率
+        # 这里需要注意 y_label
+        
+        right_probs = probs[np.arange(N), y_label]
+        
+        # print(probs[np.arrange(N), y_label])
+        # 训练过程中会有right_probs为 0 的情况，导致对 0 取对数
+        # 出现这样提示信息 RuntimeWarning: divide by zero encountered in log
+        # 这时计算出的 loss 是 Inf
+        # 可以忽略这个信息，不影响计算
+        # print("right_probs", right_probs)
+        # print("N", N)
+        
+        has_zero = np.any(right_probs == 0)
+        if has_zero:
+            loss = np.inf
+        else:
+            loss = - np.sum(np.log( right_probs )) / N
+        
+        # 计算平均交叉熵损失值
+        loss = - np.sum(np.log( right_probs )) / N
+        # print(loss)
+        lossL.append(loss)
+        
+        if i == -1 and debug:
+            print("loss", loss)
+        
+        # 反向传播
+        
+        ## 1. 反向传播到 softMax 层前
+        dprobs = probs.copy()
+        dprobs[np.arange(N), y_label] -= 1
+        dprobs /= N
+        
+        ## 2. 反向传播到最后一层前
+        dh1, dw2, db2 = affine_backward(dprobs, final_layer_cache)
+        
+        if i == -1 and debug:
+            print("dh1", dh1)
+            print("dw2", dw2)
+            print("db2", db2)
+        
+        ## 3. 反向传播至激活层前
+        dh1[relu_cache1 <= 0] = 0
+        
+        if i == -1 and debug:
+            print("relu_cache1", relu_cache1)
+            print("layer_output", dh1)
+        
+        ## 4. 反向传播至第一层前
+        dx, dw1, db1 = affine_backward(dh1, first_layer_cache)
+        
+        if i == -1 and debug:
+            print("dx", dx)
+            print("dw1", dw1)
+            print("db1", db1)
+        
+        # 更新权重 w 和偏置 b
+        ## reg: 正则化强度，目的是为了避免求出的全重过于集中
+        dw2 += reg * W2
+        dw1 += reg * W1
+        ## epsilon 学习率。直接反向传播回来的量值可能比较大，在寻找最优解的过程中
+        ## 可能会跳过最优解，这里设置一个学习率，降低更新的幅度
+        W2 += -epsilon * dw2
+        b2 += -epsilon * db2
+        W1 += -epsilon * dw1
+        b1 += -epsilon * db1
+        
+    #----训练完毕------------------
+    return W1, b1, W2, b2, lossL
+#----finish neuralnetowrk-------------
+```
+
+模型训练好了之后就是使用模型
+
+```{python}
+def test_model(testX, W1, b1, W2, b2):
+    """
+    """
+    
+    # 所有隐藏层前向传播
+    N = testX.shape[0]
+    
+    # 转换输入数据为 1 个二维矩阵，第一维是输入数据的条数，第二维是原始数据各个维度摊平
+    # 因为在线性代数中矩阵相乘，我们处理的都是二维矩阵
+    # 如果 x 是 [ [[2,3],[4,5]], [[-1,-2],[-3,-4]] ], 
+    # x_row就是 [[2,3,4,5], [-1,-2,-3,-4]]
+    # x_row = x.reshape(N, -1)
+    # 输入数据后面会被拉平，单条数据自身维度的求和就是输入维度
+    # input_dim = sum(X.shape[1:])
+    input_layer_x = testX.reshape(N, -1)
+    
+    first_layer_cache = (input_layer_x, W1, b1)
+    H1 = affine_forward(*first_layer_cache)
+
+    # 对 H1 的结果经过RELU激活函数重新计算
+    H1 = np.maximum(0, H1)
+    # relu_cache1 = H1
+
+    # 如果有其它隐藏层重复上面 3 行代码，不含注释
+    # 后面这里改成循环形式
+
+    # 基于最后一层隐藏层的结果计算输出层
+    final_layer_cache = (H1, W2, b2)
+    Y = affine_forward(*final_layer_cache)
+
+    # Y 是否需要 RELU 激活？
+
+    # 对输出结果正则化，计算每个条目数据分配到各个数据标签的概率
+    # 这也称为 Softmax 层
+    # Softmax 层的计算时为了规避数据溢出，原始值都减去了本行 (axis=1)最大值
+    # 具体看上面理论部分
+    probs = np.exp(Y - np.max(Y, axis=1, keepdims=True))
+    probs /= np.sum(probs, axis=1, keepdims=True)
+    
+    for k in range(testX.shape[0]):
+        print(testX[k,:], "预测的 label 为", np.argmax(probs[k,:]))
+
+#---- use model---------------
+```
+
+
+```{python}
+        
+def main():
+    # X: 用于训练的数据, 这个示例数据很少，只有 8 条
+    X = np.array([[3,2], 
+                  [-2,1], 
+                  [-1,-2], 
+                  [2,-1],
+                  [-1,5],
+                  [10,-10],
+                  [20,30],
+                  [-5,-20]])
+    # y_label: 训练数据的分类标签，对应于 4 个象限
+    # 这里不管是什么样的分类标签，比如normal, disease 或者 class I, II, III, IV
+    # 都需要转成数字表示，每个分类标签标记为一个数字
+    # 具体哪个分类标签是哪个数字没关系，只要能对回去就行，但为了简单需要是从 0 开始的连续数字
+    # 这样后面在提取分类到对应标签的概率时更方便。
+    y_label = np.array([0,1,2,3,1,3,0,2])
+    
+   
+    
+    epoch=10000
+    
+    W1, b1, W2, b2, lossL = neural_network(X, y_label, hidden_dim=50, reg=0.001, epsilon=0.001,
+                  epoch=epoch, random_seed=1)
+    
+
+    print(lossL[-10:])
+    
+    # plot_loss(epoch, lossL, subplot=3, subplot_size = 6, picture_name="loss.png")
+    
+    testX = np.array([[2,2],[-2,2],[-2,-2],[2,-2]])
+    
+    test_model(testX, W1, b1, W2, b2)
+    
+    return lossL
+```
+
+
+```{python}
+lossL = main()
+```
+
+## 用 Python 实现一个多层神经网络 {#pythonnnetwork}
+
+```{python}
+def neural_multiple_layer_network(X, y_label, hidden_dim=50, 
+                  hidden_layer=1, reg=0.001, epsilon=0.001,
+                  epoch=10000, random_seed=1, debug=False):
+    """
+    X: 用于训练的数据, 这个示例数据很少，只有 8 条
+       X = np.array([[3,2], 
+                  [-2,1], 
+                  [-1,-2], 
+                  [2,-1],
+                  [-1,5],
+                  [10,-10],
+                  [20,30],
+                  [-5,-20]])
+        输入数据为多维数组，形状为 (N, d)  
+        N 为总的输入数据的条数
+        d 为每条数据的维度。
+             
+        假如我们输入的是一个三维矩阵，[[[3,2],  [2,1,0]], 
+                                       [[-2,1], [1,2,0]], 
+                                       [[-1,2], [0,1,0]], 
+                                       [[2,-1], [2,3,0]]]
+             则 N = 4，表示有 4 条数据；
+                k = 2，表示每条数据是一个二维向量
+                d_k 也就是 d_1 为 2，表示该维向量的长度为 2
+                           d_2 为 3，表示该维向量的长度为 3
+              在程序里这个矩阵会被展开为一个 4 * 5 的二维矩阵
+    
+    y_label: 训练数据的分类标签，对应于 4 个象限
+             这里不管是什么样的分类标签，比如normal, disease 或者 class I, II, III, IV
+             都需要转成数字表示，每个分类标签标记为一个数字
+             具体哪个分类标签是哪个数字没关系，只要能对回去就行，但为了简单需要是从 0 开始的连续数字
+             这样后面在提取分类到对应标签的概率时更方便。
+             y_label = np.array([0,1,2,3,1,3,0,2])
+    
+    hidden_layer: 隐藏层的层数
+    
+    hidden_dim: 隐藏层的维度，是一个可自己调节的参数
+    reg: 正则化强度，是一个可自己调节的参数
+    epsilon: 梯度下降的学习率，是一个可自己调节的参数
+    epoch: 把数据集扔进网络计算的次数，是一个可自己调节的参数
+     
+    """
+    
+    
+    # 随机数发生器的种子，主要用于保证后面生成的随机数是可重复的
+    np.random.seed(random_seed)
+    
+    N = X.shape[0]
+    
+    # 转换输入数据为 1 个二维矩阵，第一维是输入数据的条数，第二维是原始数据各个维度摊平
+    # 因为在线性代数中矩阵相乘，我们处理的都是二维矩阵
+    # 如果 x 是 [ [[2,3],[4,5]], [[-1,-2],[-3,-4]] ], 
+    # x_row就是 [[2,3,4,5], [-1,-2,-3,-4]]
+    # x_row = x.reshape(N, -1)
+    # 输入数据后面会被拉平，单条数据自身维度的求和就是输入维度
+    # input_dim = sum(X.shape[1:])
+    X = X.reshape(N, -1)
+    input_dim = X.shape[1]
+    
+    # 输出参数的维度，对应于分类标签数
+    num_classes = len(np.unique(y_label))
+    
+    # 随机初始化 w1,w2,b1,b2
+    # 这个网络，有一个输入层、一个隐藏层、一个输出层，需要 2 套权重矩阵和偏置项
+    
+    
+    
+    hidden_layer_cacheL= []
+    
+    for i in range(hidden_layer):
+        
+        if i == 0:
+            # 第一隐藏层直接对接输入数据
+            # 其维度要与输入数据相匹配
+            W = np.random.randn(input_dim, hidden_dim)
+        else:
+            # 后续隐藏层对接前一个隐藏层的输出数据，
+            # 其维度要与上一层的输出相匹配
+            W = np.random.randn(hidden_dim, hidden_dim)
+            
+        b = np.zeros((1, hidden_dim))
+        hidden_layer_cacheL.append([None, W, b])
+        
+    #----------------------------------
+
+    W2 = np.random.randn(hidden_dim, num_classes)
+    b2 = np.zeros((1, num_classes))
+    
+    if debug:
+        print("hidden_layer_cacheL", hidden_layer_cacheL)
+        print("W2", W2)
+        print("b2", b2)
+    
+    lossL = []
+    
+    for i in range(epoch):
+        # 每一次训练的 cache 都是新的
+        # 最开始把这个变量放在了循环外面，每次运行都有 0.0001 的差别
+        # 反复调试定位到这个问题
+        hidden_relu_cacheL = []
+        
+        # 所有隐藏层前向传播
+        input_layer_x = X.copy()
+        for hidden_layer_num in range(hidden_layer):
+            # 每一层前向传播
+            hidden_layer_cacheL[hidden_layer_num][0] = input_layer_x
+            H1 = affine_forward(*hidden_layer_cacheL[hidden_layer_num])
+            
+            if i == -1 and debug:
+                print("H1", H1)
+            
+            # 对 H1 的结果经过RELU激活函数重新计算
+            H1 = np.maximum(0, H1)
+            if i == -1 and debug:
+                print("H1", H1)
+            hidden_relu_cacheL.append(H1)
+            input_layer_x = H1
+            
+        
+        # 基于最后一层隐藏层的结果计算输出层
+        final_layer_cache = (input_layer_x, W2, b2)
+        Y = affine_forward(*final_layer_cache)
+        
+        if i == -1 and debug:
+            print("Y", Y)
+
+        
+        # 对输出结果正则化，计算每个条目数据分配到各个数据标签的概率
+        # 这也称为 Softmax 层
+        # Softmax 层的计算时为了规避数据溢出，原始值都减去了本行 (axis=1)最大值
+        # 具体看上面理论部分
+        probs = np.exp(Y - np.max(Y, axis=1, keepdims=True))
+        probs /= np.sum(probs, axis=1, keepdims=True)
+        
+        # 计算交叉熵损失
+        N = probs.shape[0]
+        # 输出各条目数据预测正确的概率
+        # 这里需要注意 y_label
+        # print(probs[np.arrange(N), y_label])
+        right_probs = probs[np.arange(N), y_label]
+        # 计算平均交叉熵损失值
+        
+        # 训练过程中会有right_probs为 0 的情况，导致对 0 取对数
+        # 出现这样提示信息 RuntimeWarning: divide by zero encountered in log
+        # 这时计算出的 loss 是 Inf
+        # 可以忽略这个信息，不影响计算
+        # print("right_probs", right_probs)
+        # print("N", N)
+        
+        has_zero = np.any(right_probs == 0)
+        if has_zero:
+            loss = np.inf
+        else:
+            loss = - np.sum(np.log( right_probs )) / N
+        # print(loss)
+        lossL.append(loss)
+        
+        if i == -1 and debug:
+            print("loss", loss)
+        
+        # 反向传播
+        
+        ## 1. 反向传播到 softMax 层前
+        dprobs = probs.copy()
+        dprobs[np.arange(N), y_label] -= 1
+        dprobs /= N
+        
+        ## 2. 反向传播到最后一层前
+        dh1, dw2, db2 = affine_backward(dprobs, final_layer_cache)
+        
+        if i == -1 and debug:
+            print("dh1", dh1)
+            print("dw2", dw2)
+            print("db2", db2)
+        
+        # 更新权重 w 和偏置 b
+        ## reg: 正则化强度，目的是为了避免求出的全重过于集中
+        dw2 += reg * W2
+        ## epsilon 学习率。直接反向传播回来的量值可能比较大，在寻找最优解的过程中
+        ## 可能会跳过最优解，这里设置一个学习率，降低更新的幅度
+        W2 -= epsilon * dw2
+        b2 -= epsilon * db2
+        
+        
+        ## 4. 反向传播至每个激活层、隐藏层前，从后向前
+        
+        layer_output = dh1
+        
+        for hli in range(hidden_layer-1,-1,-1):
+            ## 反向传播至激活层前
+            relu_cache1 = hidden_relu_cacheL[hli]
+            layer_output[relu_cache1 <= 0] = 0
+            if i == -1 and debug:
+                print("relu_cache1", relu_cache1)
+                print("layer_output", layer_output)
+            
+            # 反向传播至隐藏层前
+            layer_cache = hidden_layer_cacheL[hli]
+            dx, dw1, db1 = affine_backward(layer_output, layer_cache)
+            layer_output = dx
+            
+            if i == -1 and debug:
+                print("dx", dx)
+                print("dw1", dw1)
+                print("db1", db1)
+            
+            W1, b1 = layer_cache[1:]
+            dw1 += reg * W1
+            W1 -= epsilon * dw1
+            b1 -= epsilon * db1
+            
+            
+        
+    #----训练完毕------------------
+    return hidden_layer_cacheL, W2, b2, lossL
+#----finish neuralnetowrk-------------
+
+
+def test_multiple_layer_model(testX, hidden_layer_cacheL, W2, b2):
+    """
+    
+    hidden_layer_cacheL = [ [X, W, b], [X, W, b] ]
+    """
+
+    # 所有隐藏层前向传播
+    N = testX.shape[0]
+    
+    # 转换输入数据为 1 个二维矩阵，第一维是输入数据的条数，第二维是原始数据各个维度摊平
+    # 因为在线性代数中矩阵相乘，我们处理的都是二维矩阵
+    # 如果 x 是 [ [[2,3],[4,5]], [[-1,-2],[-3,-4]] ], 
+    # x_row就是 [[2,3,4,5], [-1,-2,-3,-4]]
+    # x_row = x.reshape(N, -1)
+    # 输入数据后面会被拉平，单条数据自身维度的求和就是输入维度
+    # input_dim = sum(X.shape[1:])
+    input_layer_x = testX.reshape(N, -1)
+    
+    for hidden_layer_cache in hidden_layer_cacheL:
+        # 每一层前向传播
+        hidden_layer_cache[0] = input_layer_x
+        H1 = affine_forward(*hidden_layer_cache)
+        # 对 H1 的结果经过RELU激活函数重新计算
+        H1 = np.maximum(0, H1)
+        input_layer_x = H1
+
+
+    # 基于最后一层隐藏层的结果计算输出层
+    final_layer_cache = (input_layer_x, W2, b2)
+    Y = affine_forward(*final_layer_cache)
+
+    # Y 是否需要 RELU 激活？
+
+    # 对输出结果正则化，计算每个条目数据分配到各个数据标签的概率
+    # 这也称为 Softmax 层
+    # Softmax 层的计算时为了规避数据溢出，原始值都减去了本行 (axis=1)最大值
+    # 具体看上面理论部分
+    probs = np.exp(Y - np.max(Y, axis=1, keepdims=True))
+    probs /= np.sum(probs, axis=1, keepdims=True)
+    
+    for k in range(testX.shape[0]):
+        print(testX[k,:], "预测的 label 为", np.argmax(probs[k,:]))
+#----------
+
+    
+def main_multiple_layer_network():
+    
+    # X: 用于训练的数据, 这个示例数据很少，只有 8 条
+    X = np.array([[3,2], 
+                  [-2,1], 
+                  [-1,-2], 
+                  [2,-1],
+                  [-1,5],
+                  [10,-10],
+                  [20,30],
+                  [-5,-20]])
+    # y_label: 训练数据的分类标签，对应于 4 个象限
+    # 这里不管是什么样的分类标签，比如normal, disease 或者 class I, II, III, IV
+    # 都需要转成数字表示，每个分类标签标记为一个数字
+    # 具体哪个分类标签是哪个数字没关系，只要能对回去就行，但为了简单需要是从 0 开始的连续数字
+    # 这样后面在提取分类到对应标签的概率时更方便。
+    y_label = np.array([0,1,2,3,1,3,0,2])
+    
+    
+    epoch = 100
+    
+    hidden_layer_cacheL, W2, b2, lossL = neural_multiple_layer_network(X, y_label, hidden_dim=50, 
+                                         hidden_layer=3, reg=0.001, epsilon=0.001,
+                                         epoch=epoch, random_seed=1)
+    
+    # print("hidden_layer_cacheL", hidden_layer_cacheL)
+    # print("W2", W2)
+    # print("b2", b2)
+    print(lossL[-10:])
+    plot_loss(epoch, lossL, subplot=3, subplot_size = 6, picture_name="loss.png")
+    
+    testX = np.array([[2,2],[-2,2],[-2,-2],[2,-2]])
+    
+    test_multiple_layer_model(testX, hidden_layer_cacheL, W2, b2)
+    
+    return lossL
+                            
+# main()
+```
+
+```{python}
+main_multiple_layer_network()
+```
+
+
+## 参考 {#40neuralnetworkref}
+
+1. https://blog.csdn.net/starktek/article/details/129841835
+2. https://mp.weixin.qq.com/s/EJNwMWOripas1UNSEeRuRQ
+3. https://mp.weixin.qq.com/s/lk12kP2fbuSBSV5lSFKTlA 
+
+
