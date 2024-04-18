@@ -13,6 +13,8 @@
     # Win10 安装Ubuntu系统
 
     # 参考链接：https://mp.weixin.qq.com/s?__biz=MzUzMjA4Njc1MA==&mid=2247491728&idx=1&sn=5529fb60cfb7fc3150368a79448d51ab&scene=21#wechat_redirect
+	#  Win11还需要安装 https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi
+
 
     # 启动进入Win10的Ubuntu系统后执行下面的命令
 
@@ -53,7 +55,7 @@
     tar -vxzf /mnt/c/transcriptome.env.tar.gz -C ~/miniconda3/envs/transcriptome
 
     # 激活环境
-    source ~/miniconda3/envs/qiime2/bin/activate
+    source ~/miniconda3/envs/transcriptome/bin/activate
     conda-unpack
 
 ## 在Linux/Unix服务器进行下面的操作
@@ -94,7 +96,7 @@
     tar -vxzf ~/transcriptome.env.tar.gz -C ~/miniconda3/envs/transcriptome
 
     # 激活环境
-    source ~/miniconda3/envs/qiime2/bin/activate
+    source ~/miniconda3/envs/transcriptome/bin/activate
     conda-unpack
 
 
@@ -168,9 +170,9 @@
     cp -rf easyTranscriptome*/* ~/transcriptome/soft/
     cd ~/transcriptome/soft/CPC2/libs/libsvm/libsvm-3.18
     make clean && make
-    ln -s /transcriptome/soft/CPC2/bin/* ~/transcriptome/soft/
+    ln -s ~/transcriptome/soft/CPC2/bin/* ~/transcriptome/soft/
     chmod 755 ~/transcriptome/soft/*
-
+    export PATH=$PATH:~/transcriptome/soft/
 
 # 备选安装方案 (前面的安装都包含了所有内容，如果有失败或其他原因才使用后面的安装)
 
