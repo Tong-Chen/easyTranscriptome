@@ -70,47 +70,14 @@ all_DE <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.all.DE.txt", se
 combine_de <- left_join(all_DE, idmap, by=c("V1"="ENSG"))
 
 all_entrez <- combine_de[,c(4,2)]
-write.table(all_entrez[all_entrez[,1] != "",,drop=F], file="15_enrichment/ehbio.DESeq2.all.DE.entrez.txt", quote=F, sep="\t", row.names=F, col.names=F)
+
+write.table(all_entrez[all_entrez[,1] != "",,drop=F], file="result/salmon_deseq2/ehbio.DESeq2.all.DE.entrez.txt", quote=F, sep="\t", row.names=F, col.names=F)
 
 all_symbol <- combine_de[,c(3,2)]
-write.table(all_symbol[all_symbol[,1] !="", ,drop=F], file="15_enrichment/ehbio.DESeq2.all.DE.symbol.txt", quote=F, sep="\t", row.names=F, col.names=F)
+write.table(all_symbol[all_symbol[,1] !="", ,drop=F], file="result/salmon_deseq2/ehbio.DESeq2.all.DE.symbol.txt", quote=F, sep="\t", row.names=F, col.names=F)
 ```
 
-对差异基因表格做ID转换
 
-```{r}
-suppressMessages(library(tidyverse))
-suppressMessages(library(ImageGP))
-
-idmap <- read.table("13_salmon_deseq2/genome/GRCh38.idmap.txt", sep="\t", header=T, row.names=NULL, quote="")
-
-DEresult <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.trt._vs_.untrt.results.txt", sep="\t", header=T, row.names=NULL, quote="")
-
-vst <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.normalized.vst.txt", sep="\t", header=T, row.names=NULL, quote="")
-
-head(vst)
-combine_vst <- left_join(vst, idmap, by=c("id"="ENSG"))
-# combine_vst <- combine_vst[combine_vst$Symbol!="", ]
-vst[,1] <- combine_vst$Symbol
-
-head(vst)
-
-head(combine_vst)
-
-DEresult <- DEresult[,c(1,5)]
-
-combine_de <- left_join(DEresult, idmap, by=c("ID"="ENSG"))
-
-head(combine_de)
-
-all_entrez <- combine_de[,c(4,2)]
-all_entrez <- all_entrez[all_entrez$Entrez!="",]
-write.table(all_entrez, file="15_enrichment/ehbio_salmon.DESeq2.log2fc_ranked.entrez.txt", quote=F, sep="\t", row.names=F, col.names=F)
-
-all_symbol <- combine_de[,c(3,2)]
-all_symbol <- all_symbol[all_symbol[,1] !="", ,drop=F]
-write.table(all_symbol, file="15_enrichment/ehbio_salmon.DESeq2.log2fc_ranked.symbol.txt", quote=F, sep="\t", row.names=F, col.names=F)
-```
 
 ### KEGG富集分析
 

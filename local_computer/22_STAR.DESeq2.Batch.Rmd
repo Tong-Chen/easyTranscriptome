@@ -470,7 +470,7 @@ head(untrt_up_genes_expr_long)
 
 # metadata$Sample = rownames(metadata)
 
-#ImageGP:::sp_writeTable(untrt_up_genes_expr_long, file="1", keep_rownames =F)
+ImageGP:::sp_writeTable(untrt_up_genes_expr_long, file="1", keep_rownames =F)
 
 sp_boxplot(untrt_up_genes_expr_long, melted=T, metadata=plot_data, 
            xvariable = "conditions", yvariable = "Expr", jitter_bp = T, 
@@ -513,7 +513,7 @@ sp_boxplot(untrt_down_genes_expr_long, melted=T, metadata=plot_data,
   theme(legend.direction = "horizontal")
 ```
 
-额外的一个信息是`SVA_batch_speific`中红色和绿色个体本地表达区分不明显。这可能是基于SVA预测的混杂因素与已知的批次因素校正后结果有差异的一个原因 (这两个个体的SV值很接近)。
+额外的一个信息是`SVA_batch_speific`中红色和绿色个体本底表达区分不明显。这可能是基于SVA预测的混杂因素与已知的批次因素校正后结果有差异的一个原因 (这两个个体的SV值很接近)。
 
 另外一个导致SVA预测的批次与已知的批次效应校正后结果不同的原因也可能是我们只让`SVA`预测了2个混杂因素。留下2个去探索的问题，欢迎留言或投稿讨论：
 

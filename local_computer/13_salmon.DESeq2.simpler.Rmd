@@ -141,7 +141,7 @@ normalizedExpr2DistribBoxplot(normexpr)
 #                     saveplot=paste(output_prefix, "DESeq2.sampleCorrelation.pdf", sep="."))
 # 如果出现figure margins too large; 把下面代码拷贝到左下角console里面，回车运行即可
 # 是因为屏幕太小了，图输出不全导致的。
-clusterSampleHeatmap2(normexpr$vst[1:100,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
+clusterSampleHeatmap2(normexpr$vst[1:1000,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
 clusterSampleUpperTriPlot(normexpr$vst[1:1000,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
 ```
 
@@ -193,7 +193,41 @@ plots[[4]]
 multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, comparePairFile=comparePairFile, padj=padj, 
 log2FC=log2FC, normalized_counts=normexpr)
 ```
+对差异基因表格做ID转换
 
+```{r}
+suppressMessages(library(tidyverse))
+suppressMessages(library(ImageGP))
+
+idmap <- read.table("13_salmon_deseq2/genome/GRCh38.idmap.txt", sep="\t", header=T, row.names=NULL, quote="")
+
+DEresult <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.trt._vs_.untrt.results.txt", sep="\t", header=T, row.names=NULL, quote="")
+
+vst <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.normalized.vst.txt", sep="\t", header=T, row.names=NULL, quote="")
+
+head(vst)
+combine_vst <- left_join(vst, idmap, by=c("id"="ENSG"))
+# combine_vst <- combine_vst[combine_vst$Symbol!="", ]
+vst[,1] <- combine_vst$Symbol
+
+head(vst)
+
+head(combine_vst)
+
+DEresult <- DEresult[,c(1,5)]
+
+combine_de <- left_join(DEresult, idmap, by=c("ID"="ENSG"))
+
+head(combine_de)
+
+all_entrez <- combine_de[,c(4,2)]
+all_entrez <- all_entrez[all_entrez$Entrez!="",]
+write.table(all_entrez, file="result/salmon_deseq2/ehbio_salmon.DESeq2.log2fc_ranked.entrez.txt", quote=F, sep="\t", row.names=F, col.names=T)
+
+all_symbol <- combine_de[,c(3,2)]
+all_symbol <- all_symbol[all_symbol[,1] !="", ,drop=F]
+write.table(all_symbol, file="result/salmon_deseq2/ehbio_salmon.DESeq2.log2fc_ranked.symbol.txt", quote=F, sep="\t", row.names=F, col.names=T)
+```
 
 ### 结果文件描述
 
