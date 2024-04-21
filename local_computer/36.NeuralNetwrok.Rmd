@@ -10,6 +10,10 @@
 
 正向传播函数 (`affine_forward`)和反向传播函数 (`affine_backward`)是2个公用函数，直接定义在了最前面。
 
+```
+conda install numpy matplotlib
+```
+
 ```{python}
 import numpy as np
 import matplotlib.pyplot as plt
@@ -416,6 +420,10 @@ def main():
 lossL = main()
 ```
 
+```{python}
+plot_loss(10000, lossL, subplot=3, subplot_size = 6, picture_name="loss.png")
+```
+
 ## 用 Python 实现一个多层神经网络 {#pythonnnetwork}
 
 ```{python}
@@ -677,8 +685,13 @@ def test_multiple_layer_model(testX, hidden_layer_cacheL, W2, b2):
     probs = np.exp(Y - np.max(Y, axis=1, keepdims=True))
     probs /= np.sum(probs, axis=1, keepdims=True)
     
+    test_y = []
+    
     for k in range(testX.shape[0]):
-        print(testX[k,:], "预测的 label 为", np.argmax(probs[k,:]))
+        label = np.argmax(probs[k,:])
+        test_y.append(label)
+        print(testX[k,:], "预测的 label 为", label)
+    return test_y
 #----------
 
     
@@ -726,6 +739,121 @@ def main_multiple_layer_network():
 main_multiple_layer_network()
 ```
 
+```{python}
+
+def main_multiple_layer_network2():
+    
+    # X: 用于训练的数据, 这个示例数据很少，只有 8 条
+    #X = np.array([[3,2], 
+    #              [-2,1], 
+    #              [-1,-2], 
+    #              [2,-1],
+    #              [-1,5],
+    #              [10,-10],
+    #              [20,30],
+    #              [-5,-20]])
+    # y_label: 训练数据的分类标签，对应于 4 个象限
+    # 这里不管是什么样的分类标签，比如normal, disease 或者 class I, II, III, IV
+    # 都需要转成数字表示，每个分类标签标记为一个数字
+    # 具体哪个分类标签是哪个数字没关系，只要能对回去就行，但为了简单需要是从 0 开始的连续数字
+    # 这样后面在提取分类到对应标签的概率时更方便。
+    #y_label = np.array([0,1,2,3,1,3,0,2])
+    
+    expr_file = "35_machine_learning/prostat.expr.symbol.txt"
+    metadata_file = "35_machine_learning/prostat.metadata.txt"
+    
+    header = 1
+    nSample = 0
+    for line in open(expr_file):
+        if header:
+            header -= 1
+            lineL = line.strip().split('\t')[1:]
+            nSample = len(lineL)
+            expr_dataL = [[] for i in range(nSample)]
+            continue
+        for index1, value in enumerate(line.strip().split('\t')[1:]):
+            expr_dataL[index1].append(value)
+    #-----------------------
+    print(nSample)
+    print(len(expr_dataL))
+    print(len(expr_dataL[0]))
+    
+    # return
+    header = 1
+    labelL = []
+    for line in open(metadata_file):
+        if header:
+            header -= 1
+            continue
+        label = line.strip().split('\t')[1]
+        labelL.append(label)
+    #---------------------------------
+    unique_labelL = set(labelL)
+    label2numD = dict([(j,i) for i,j in enumerate(unique_labelL)])
+    y = [label2numD[i] for i in labelL]
+    print(len(y))
+    
+    size = int(nSample * 80 / 100)
+    allpositionL = list(range(nSample))
+    train_sample_indexL = np.random.choice(allpositionL, size=size, replace=False)
+    
+    train_x = []
+    train_y = []
+    test_x  = []
+    test_y  = []
+    
+    for index_all in allpositionL:
+        if index_all in train_sample_indexL:
+            train_x.append(expr_dataL[index_all])
+            train_y.append(y[index_all])
+        else:
+            test_x.append(expr_dataL[index_all])
+            test_y.append(y[index_all])
+    
+    train_x = np.array(train_x, np.float32)
+    #train_y = np.array(train_y)
+    test_x  = np.array(test_x, np.float32)
+    #test_y  = np.array(test_y)
+    
+    #print(train_x.shape)
+    #print(train_y.shape)
+    #print(test_x.shape)
+    #print(test_y.shape)
+    
+    # return
+    
+    epoch = 10000
+    
+    hidden_layer_cacheL, W2, b2, lossL = neural_multiple_layer_network(train_x, train_y, hidden_dim=50, 
+                                         hidden_layer=3, reg=0.001, epsilon=0.001,
+                                         epoch=epoch, random_seed=1)
+    
+    # print("hidden_layer_cacheL", hidden_layer_cacheL)
+    # print("W2", W2)
+    # print("b2", b2)
+    # print(lossL[-10:])
+    plot_loss(epoch, lossL, subplot=3, subplot_size = 6, picture_name="loss.png")
+    
+    # testX = np.array([[2,2],[-2,2],[-2,-2],[2,-2]])
+    
+    predict_y = test_multiple_layer_model(test_x, hidden_layer_cacheL, W2, b2)
+    
+    return lossL, predict_y, test_y
+                            
+lossL, predict_y, test_y = main_multiple_layer_network2()
+```
+
+```{python}
+predictResultD = {}
+for i,j in zip(predict_y, test_y):
+    if j not in predictResultD:
+        predictResultD[j] = {'right':0, 'wrong': 0}
+    if i==j:
+        predictResultD[j]['right']+=1
+    else:
+        predictResultD[j]['wrong']+=1
+predictResultD          
+```
 
 ## 参考 {#40neuralnetworkref}
 

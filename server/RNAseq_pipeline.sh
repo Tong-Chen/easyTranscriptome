@@ -279,6 +279,8 @@
     # it just takes a few more minutes per sample. 
     # For samples with moderate to high GC bias, correction for this bias at the 
     # fragment level has been shown to reduce isoform quantification errors
+    
+    # 如果需要基因的定量结果，则加参数-g ${db}/Genome.gtf
     salmon quant --gcBias -l A -1 seq/trt_N061011_1.fq.gz -2 seq/trt_N061011_2.fq.gz \
       -i ${db}/Genome_index.salmon -o result/trt_N061011/trt_N061011.salmon.count -p 1
     

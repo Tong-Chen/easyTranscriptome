@@ -20,6 +20,8 @@ output:
 knitr::opts_chunk$set( echo = TRUE, message=FALSE, warning=FALSE, fig.width=8 )
 ```
 
+也可以通过在线平台<https://www.bic.ac.cn/BIC/#/>实现。
+
 ## 检查有无缺失的包并安装，加载所有包
 
 ```{r}
@@ -169,7 +171,7 @@ net <- WGCNA_coexprNetwork(datExpr, power, minModuleSize=minModuleSize, corType 
 
 ### 存储共表达模块
 
-存储基因共表达模块并绘制模块间相似性热土。
+存储基因共表达模块并绘制模块间相似性热图。
 
 ```{r}
 # MEs_col <- WGCNA_saveModuleAndMe(net, datExpr,  prefix=output_prefix， 
