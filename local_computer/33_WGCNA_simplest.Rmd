@@ -102,7 +102,7 @@ exprMat <- "33_WGCNA/LiverFemaleClean.txt"
 # traitData <- NULL
 traitData <- "33_WGCNA/TraitsClean.txt"
 
-dir.create("result/WGCNA")
+dir.create("result/WGCNA", recursive = T, showWarnings = F)
 
 output_prefix <- "result/WGCNA/ehbio"
 
@@ -121,10 +121,8 @@ networkType = "signed"
 
 ```{r, fig.width=9, fig.height=6}
 wgcnaL <- WGCNA_readindata(exprMat, traitData)
-datExpr <- wgcnaL$datExpr
 
-
-WGCNA_dataCheck(datExpr, saveplot=paste0(output_prefix, ".WGCNA_dataCheck.pdf"), width=20)
+WGCNA_dataCheck(wgcnaL$datExpr, saveplot=paste0(output_prefix, ".WGCNA_dataCheck.pdf"), width=20)
 # WGCNA_dataCheck(datExpr, width=20)
 ```
 
@@ -135,20 +133,15 @@ WGCNA_dataCheck(datExpr, saveplot=paste0(output_prefix, ".WGCNA_dataCheck.pdf"),
 数据按MAD值排序，可以选择保留前75% (默认)或前10000个用于后续分析。
 
 ```{r, fig.width=9, fig.height=7}
-datExpr <- WGCNA_dataFilter(datExpr, top_mad_n=1)
+wgcnaL <- WGCNA_dataFilter(wgcnaL, top_mad_n=1)
 
-# 如果没有表型数据，使用下面这句命令
-# datExpr <- WGCNA_sampleClusterDetectOutlier(datExpr)
-
-# datExpr <- WGCNA_sampleClusterDetectOutlier(datExpr, traitColors=wgcnaL$traitColorstaobao, saveplot=paste0(output_prefix, ".WGCNA_sampleClusterDetectOutlier.pdf")
-datExpr <- WGCNA_sampleClusterDetectOutlier(datExpr, traitColors=wgcnaL$traitColors, removeOutlier = T)
+wgcnaL <- WGCNA_sampleClusterDetectOutlier(wgcnaL, traitColors=wgcnaL$traitColors, removeOutlier = T)
 ```
 
 ### 筛选合适的软阈值 (soft power)
 
 ```{r}
-# power <- WGCNA_softpower(datExpr, saveplot="33_WGCNA/WGCNA_softpower.pdf")
-powerList <- WGCNA_softpower(datExpr, RsquaredCut=RsquaredCut, networkType=networkType, saveplot=paste0(output_prefix, ".power.pdf"))
+powerList <- WGCNA_softpower(wgcnaL$datExpr, RsquaredCut=RsquaredCut, networkType=networkType, saveplot=paste0(output_prefix, ".power.pdf"))
 power = powerList$power
 p = powerList$p
 print(paste0("The selected power is ", power))
@@ -164,7 +157,7 @@ print(p)
 
 ```{r}
 set.seed(508)
-net <- WGCNA_coexprNetwork(datExpr, power, minModuleSize=minModuleSize, corType = corType, networkType = networkType)
+net <- WGCNA_coexprNetwork(wgcnaL$datExpr, power, minModuleSize=minModuleSize, corType = corType, networkType = networkType)
 # net <- WGCNA_coexprNetwork(datExpr, power, networkType = "unsigned")
 # net <- WGCNA_coexprNetwork(datExpr, power, saveplot=paste0(output_prefix, "WGCNA_module_generation_plot.pdf"))
 ```
@@ -176,15 +169,13 @@ net <- WGCNA_coexprNetwork(datExpr, power, minModuleSize=minModuleSize, corType 
 ```{r}
 # MEs_col <- WGCNA_saveModuleAndMe(net, datExpr,  prefix=output_prefix， 
 # saveplot=paste0(output_prefix, ".WGCNA_module_correlation_plot.pdf")
-MEs_col <- WGCNA_saveModuleAndMe(net, datExpr, prefix=output_prefix)
+MEs_col <- WGCNA_saveModuleAndMe(net, wgcnaL$datExpr, prefix=output_prefix)
 ```
 
 ### 模块和性状关联热图
 
 
 ```{r, fig.width=12, fig.height=10}
-# wgcnaL$traitData = WGCNA_filterTrait(datExpr, wgcnaL$traitData)
-# wgcnaL$traitColors = WGCNA_filterTrait(datExpr, wgcnaL$traitColors)
 # WGCNA_moduleTraitPlot(MEs_col, traitData=wgcnaL$traitData, saveplot="33_WGCNA/WGCNA_moduleTraitHeatmap.pdf", width=15, height=12)
 WGCNA_moduleTraitPlot(MEs_col, traitData=wgcnaL$traitData, prefix = output_prefix, corType=corType)
 ```
@@ -192,8 +183,7 @@ WGCNA_moduleTraitPlot(MEs_col, traitData=wgcnaL$traitData, prefix = output_prefi
 ### 模块的基因与性状相关性热图
 
 ```{r, fig.width=9, fig.height=8}
-# geneTraitCor <- WGCNA_ModuleGeneTraitHeatmap(datExpr, traitData=wgcnaL$traitData, net=net, saveplot=paste0(output_prefix, ".WGCNA_ModuleGeneTraitHeatmap.pdf"))
-geneTraitCor <- WGCNA_ModuleGeneTraitHeatmap(datExpr, traitData=wgcnaL$traitData, net=net, prefix = output_prefix, corType=corType)
+geneTraitCor <- WGCNA_ModuleGeneTraitHeatmap(wgcnaL$datExpr, traitData=wgcnaL$traitData, net=net, prefix = output_prefix, corType=corType)
 ```
 
 ### WGCNA导出Cytoscape网络图数据和鉴定Hub gene
@@ -202,7 +192,7 @@ geneTraitCor <- WGCNA_ModuleGeneTraitHeatmap(datExpr, traitData=wgcnaL$traitData
 
 
 ```{r}
-cyt <- WGCNA_cytoscape(net, power, datExpr, prefix=output_prefix)
+cyt <- WGCNA_cytoscape(net, power, wgcnaL$datExpr, prefix=output_prefix)
 
 hubgene <- WGCNA_hubgene(cyt, top_hub_n=20, prefix=output_prefix)
 
@@ -216,7 +206,7 @@ hubgene %>% group_by(Module1) %>% top_n(2)
 遍历每一个模块和性状，寻找与模块和性状都显著相关的基因视为Marker基因。结果输出一堆PDF。
 
 ```{r}
-WGCNA_GeneModuleTraitCoorelation(datExpr, MEs_col, geneTraitCor, traitData=wgcnaL$traitData, net, prefix=output_prefix, corType=corType)
+WGCNA_GeneModuleTraitCoorelation(wgcnaL$datExpr, MEs_col, geneTraitCor, traitData=wgcnaL$traitData, net, prefix=output_prefix, corType=corType)
 ```
 
 
