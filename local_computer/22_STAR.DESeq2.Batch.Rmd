@@ -1,5 +1,5 @@
 ---
-title: "高通量数据中批次效应的鉴定和处理"
+title: "基于组学数据差异分析的靶点发现"
 author: "陈同"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -34,16 +34,16 @@ installed_packages = data.frame(installed.packages())
 a = rownames(installed_packages)
 
 # 安装指定版本的ggbeeswarm
-if (!"ggbeeswarm" %in% a){
-   install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
-} else {
-  if (installed_packages["ggbeeswarm","Version"] != "0.6.0") {
-    install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
-  }
-}
+# if (!"ggbeeswarm" %in% a){
+#    install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
+# } else {
+#   if (installed_packages["ggbeeswarm","Version"] != "0.6.0") {
+#    install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
+#   }
+# }
 
 install_bioc <- c("tidyverse", "DESeq2", "RColorBrewer", "ggplot2", "org.Hs.eg.db",
-                  "reshape2", "stringr", "gplots","tidyr","amap","BiocParallel","sva",
+                  "reshape2", "stringr", "beeswarm", "vipor",  "gplots","tidyr","amap","BiocParallel","sva",
                   "ggfortify","patchwork", "ggrepel",
                   "VennDiagram","grid", "limma", 
                   "devtools","rmarkdown","dplyr","conflicted")
@@ -86,7 +86,7 @@ suppressMessages(library(conflicted))
 conflict_prefer("select", "dplyr")
 ```
 
-输入文件1： `reads count`矩阵 (*ehbio_trans.Count_matrix.txt*)，格式如下：
+输入文件1： `reads count`矩阵 (*STAR_trans.Count_matrix.txt*)，格式如下：
 
     ENSG    untrt_N61311    untrt_N052611   untrt_N080611   untrt_N061011   trt_N61311  trt_N052611 trt_N080611 trt_N061011
     ENSG00000223972 1   0   0   0   0   1   0   0
@@ -112,10 +112,10 @@ conflict_prefer("select", "dplyr")
 ```{r}
 # Prefix for all output file 
 dir.create("result/batch", recursive = T)
-output_prefix = "result/batch/ehbio.simpler"
+output_prefix = "result/batch/STAR.simpler"
 
 # pipelineStar.sh或其它方式生成的reads count 文件，行为基因，列为样品
-file = "22_star_deseq2_go/ehbio_trans.Count_matrix.txt"
+file = "22_star_deseq2_go/STAR_trans.Count_matrix.txt"
 # 分组信息表
 metadata = "22_star_deseq2_go/metadata.txt"
 # 分组信息所在列名字
@@ -134,7 +134,7 @@ log2FC=1
 ```{r}
 dds <- readscount2deseq(file, metadata, design=design, covariate = covariate)
 
-normexpr <- deseq2normalizedExpr(dds, output_prefix=output_prefix, rlog=F, vst=T)
+normexpr <- deseq2normalizedExpr(dds, output_prefix=output_prefix, rlog=F, vst=T, design=design)
 ```
 
 检查数据标准化效果: 标准化后基因在不同样品的表达分布越均一越好。从下图看不出存在批次效应的影响。
@@ -163,7 +163,7 @@ metadata = as.data.frame(colData(dds))
 sp_pca(normexpr$vst[1:1000,], metadata, color_variable="conditions", shape_variable = "individual") + aes(size=1) + guides(size = "none")
 ```
 
-先鉴定出差异基因，获得差异基因文件`ehbio.simpler.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。
+先鉴定出差异基因，获得差异基因文件`STAR.simpler.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。
 
 ```{r}
 multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, padj=padj, log2FC=log2FC, normalized_counts=normexpr)
@@ -176,10 +176,10 @@ multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, padj=padj,
 ```{r}
 # Prefix for all output file 
 dir.create("result/batch")
-output_prefix = "result/batch/ehbio.simpler.batch"
+output_prefix = "result/batch/STAR.simpler.batch"
 
 # pipelineStar.sh生成的reads count 文件，行为基因，列为样品
-file = "22_star_deseq2_go/ehbio_trans.Count_matrix.txt"
+file = "22_star_deseq2_go/STAR_trans.Count_matrix.txt"
 # 分组信息表
 metadata = "22_star_deseq2_go/metadata.txt"
 # 分组信息所在列名字
@@ -198,7 +198,7 @@ log2FC=1
 
 ```{r}
 dds <- readscount2deseq(file, metadata, design=design, covariate = covariate)
-normexpr <- deseq2normalizedExpr(dds, output_prefix=output_prefix, rlog=F, vst=T)
+normexpr <- deseq2normalizedExpr(dds, output_prefix=output_prefix, rlog=F, vst=T, design=design)
 normalizedExpr2DistribBoxplot(normexpr)
 ```
 
@@ -222,7 +222,7 @@ sp_pca(normexpr$vst[1:5000,], metadata, color_variable="conditions", shape_varia
 
 是不是批次变量加错了呢，还是添加的批次变量未生效？可以说都不是，操作没问题，只是`DESeq2`处理时只在差异分析模型中考虑批次效应信息，而不会`直接校正表达矩阵`。那我们先看下加了批次后差异分析的结果怎样，后续我们再讲如何校正表达矩阵。
 
-鉴定出差异基因，获得差异基因文件`ehbio.simpler.batch.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。
+鉴定出差异基因，获得差异基因文件`STAR.simpler.batch.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。
 
 ```{r}
 multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, padj=padj, log2FC=log2FC, normalized_counts=normexpr)
@@ -233,13 +233,13 @@ multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, padj=padj,
 校正后，差异基因数目变多了，上调多了*99*个，下调多了*61*个。不过数目变化，也说明不了太多问题。
 
 ```{r}
-de_before_batch = sp_readTable("result/batch/ehbio.simpler.DESeq2.all.DE.txt", header=F)
+de_before_batch = sp_readTable("result/batch/STAR.simpler.DESeq2.all.DE.txt", header=F)
 de_before_batch$V2 = paste("Before_batch",de_before_batch$V2,sep="_")
 table(de_before_batch$V2)
 ```
 
 ```{r}
-de_after_batch = sp_readTable("result/batch/ehbio.simpler.batch.DESeq2.all.DE.txt", header=F)
+de_after_batch = sp_readTable("result/batch/STAR.simpler.batch.DESeq2.all.DE.txt", header=F)
 de_after_batch$V2 = paste("After_known_batch",de_after_batch$V2,sep="_")
 table(de_after_batch$V2)
 ```
@@ -311,10 +311,10 @@ p1 + p2 + plot_layout(guide = 'collect')
 
 ```{r}
 # Prefix for all output file 
-output_prefix = "result/batch/ehbio.simpler.sva_batch"
+output_prefix = "result/batch/STAR.simpler.sva_batch"
 
 # pipelineStar.sh或其它方式生成的reads count 文件，行为基因，列为样品
-file = "22_star_deseq2_go/ehbio_trans.Count_matrix.txt"
+file = "22_star_deseq2_go/STAR_trans.Count_matrix.txt"
 # 分组信息表
 metadata = "22_star_deseq2_go/metadata.txt"
 # 分组信息所在列名字
@@ -332,7 +332,7 @@ log2FC=1
 
 ```{r}
 dds <- readscount2deseq(file, metadata, design=design, covariate = covariate)
-normexpr <- deseq2normalizedExpr(dds, output_prefix=output_prefix, rlog=F, vst=T)
+normexpr <- deseq2normalizedExpr(dds, output_prefix=output_prefix, rlog=F, vst=T, design=design)
 ```
 
 ### 预测可能存在的混杂因素 {#batch11}
@@ -385,7 +385,7 @@ p1+p2
 
 ### 基于预测出的混杂因素再次进行差异分析
 
-获得差异基因文件`ehbio.simpler.sva_batch.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。
+获得差异基因文件`STAR.simpler.sva_batch.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。
 
 ```{r}
 multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, padj=padj, log2FC=log2FC, normalized_counts=normexpr)
@@ -396,19 +396,19 @@ multipleGroupDEgenes(dds, design=design, output_prefix=output_prefix, padj=padj,
 根据已知批次信息校正后差异基因数目变多了，上调了*99*个，下调多了*61*个。根据预测的混杂因素校正后，上调多了*96*个，下调多了*55*个。从数目上看，根据已知批次和预测的混杂因素获得的差异基因是基本已知的。
 
 ```{r}
-de_before_batch = sp_readTable("result/batch/ehbio.simpler.DESeq2.all.DE.txt", header=F)
+de_before_batch = sp_readTable("result/batch/STAR.simpler.DESeq2.all.DE.txt", header=F)
 de_before_batch$V2 = paste("Before_batch",de_before_batch$V2,sep="_")
 table(de_before_batch$V2)
 ```
 
 ```{r}
-de_after_known_batch = sp_readTable("result/batch/ehbio.simpler.batch.DESeq2.all.DE.txt", header=F)
+de_after_known_batch = sp_readTable("result/batch/STAR.simpler.batch.DESeq2.all.DE.txt", header=F)
 de_after_known_batch$V2 = paste("After_known_batch",de_after_known_batch$V2,sep="_")
 table(de_after_known_batch$V2)
 ```
 
 ```{r}
-de_after_sva_batch = sp_readTable("result/batch/ehbio.simpler.sva_batch.DESeq2.all.DE.txt", header=F)
+de_after_sva_batch = sp_readTable("result/batch/STAR.simpler.sva_batch.DESeq2.all.DE.txt", header=F)
 de_after_sva_batch$V2 = paste("After_sva_batch",de_after_sva_batch$V2,sep="_")
 table(de_after_sva_batch$V2)
 ```
@@ -524,7 +524,7 @@ sp_boxplot(untrt_down_genes_expr_long, melted=T, metadata=plot_data,
 
 处理批次因素最好的方式还是如前面所述将其整合到差异基因鉴定模型中，降低批次因素带来的模型残差的自由度。但一些下游分析，比如数据可视化，也需要直接移除效应影响的数据来展示，这时可以使用`ComBat`或`removeBatchEffect`函数来处理。
 
-输入数据，标准化且log转换后的数据 `ehbio.simpler.DESeq2.normalized.vst.txt`
+输入数据，标准化且log转换后的数据 `STAR.simpler.DESeq2.normalized.vst.txt`
 
     id  untrt_N61311    untrt_N052611   untrt_N080611   untrt_N061011   trt_N61311  trt_N052611 trt_N080611 trt_N061011
     ENSG00000115414 18.02   18.62   17.83   18.45   17.95   18.54   18.15   18.50 
@@ -547,7 +547,7 @@ sp_boxplot(untrt_down_genes_expr_long, melted=T, metadata=plot_data,
 ### 读入标准化后的表达矩阵和样品信息表
 
 ```{r}
-expr_File <- "result/batch/ehbio.simpler.DESeq2.normalized.vst.txt"
+expr_File <- "result/batch/STAR.simpler.DESeq2.normalized.vst.txt"
 expr_mat <- sp_readTable(expr_File, row.names=1)
 
 head(expr_mat)
