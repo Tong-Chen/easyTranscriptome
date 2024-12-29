@@ -5,6 +5,8 @@ local_computer/.Rproj.user
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
+.Rhistory
 
 # C extensions
 *.so

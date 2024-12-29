@@ -4,7 +4,7 @@
     
     # 作者 Authors: 陈同 (Chen Tong)等
     # 版本 Version: v2.0
-    # 更新 Update: 2024-1-05
+    # 更新 Update: 2024-4-18
     # 系统要求 System requirement: Windows 10 / Mac OS 10.12+ / Ubuntu 16.04+ / CentOS
     
     # 1. 这一部分是在远程服务器的Rstudio界面利用远程服务器的计算资源进行的操作。
@@ -279,8 +279,6 @@
     # it just takes a few more minutes per sample. 
     # For samples with moderate to high GC bias, correction for this bias at the 
     # fragment level has been shown to reduce isoform quantification errors
-    
-    # 如果需要基因的定量结果，则加参数-g ${db}/Genome.gtf
     salmon quant --gcBias -l A -1 seq/trt_N061011_1.fq.gz -2 seq/trt_N061011_2.fq.gz \
       -i ${db}/Genome_index.salmon -o result/trt_N061011/trt_N061011.salmon.count -p 1
     
