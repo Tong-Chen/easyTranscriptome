@@ -34,13 +34,13 @@ installed_packages = data.frame(installed.packages())
 a = rownames(installed_packages)
 
 # 安装指定版本的ggbeeswarm
-# if (!"ggbeeswarm" %in% a){
-#    install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
-# } else {
-#   if (installed_packages["ggbeeswarm","Version"] != "0.6.0") {
-#    install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
-#   }
-# }
+if (!"ggbeeswarm" %in% a){
+  install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
+} else {
+  if (installed_packages["ggbeeswarm","Version"] != "0.6.0") {
+   install.packages("https://cran.r-project.org/src/contrib/Archive/ggbeeswarm/ggbeeswarm_0.6.0.tar.gz", repos = NULL, type = "source")
+  }
+}
 
 install_bioc <- c("tidyverse", "DESeq2", "RColorBrewer", "ggplot2", "org.Hs.eg.db",
                   "reshape2", "stringr", "beeswarm", "vipor",  "gplots","tidyr","amap","BiocParallel","sva",

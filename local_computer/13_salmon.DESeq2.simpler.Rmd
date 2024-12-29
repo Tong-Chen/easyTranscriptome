@@ -95,7 +95,7 @@ if (!file.exists(output_dir)){
   dir.create(output_dir, recursive = T)
 }
 
-output_prefix = paste0(output_dir,"ehbio.simplier")
+output_prefix = paste0(output_dir,"ysx.simplier")
 
 # pipelineSalmon.sh生成的一个两列文件，第一列是样品名字，第二列是salmon定量结果的位置，注意第二列文件的路径
 file = "13_salmon_deseq2/salmon.output"
@@ -141,7 +141,7 @@ normalizedExpr2DistribBoxplot(normexpr)
 #                     saveplot=paste(output_prefix, "DESeq2.sampleCorrelation.pdf", sep="."))
 # 如果出现figure margins too large; 把下面代码拷贝到左下角console里面，回车运行即可
 # 是因为屏幕太小了，图输出不全导致的。
-clusterSampleHeatmap2(normexpr$vst[1:1000,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
+clusterSampleHeatmap2(normexpr$vst[1:500,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
 clusterSampleUpperTriPlot(normexpr$vst[1:1000,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
 ```
 
@@ -203,9 +203,9 @@ suppressMessages(library(ImageGP))
 
 idmap <- read.table("13_salmon_deseq2/genome/GRCh38.idmap.txt", sep="\t", header=T, row.names=NULL, quote="")
 
-DEresult <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.trt._vs_.untrt.results.txt", sep="\t", header=T, row.names=NULL, quote="")
+DEresult <- read.table("result/salmon_deseq2/ysx.simplier.DESeq2.trt._vs_.untrt.results.txt", sep="\t", header=T, row.names=NULL, quote="")
 
-vst <- read.table("result/salmon_deseq2/ehbio.simplier.DESeq2.normalized.vst.txt", sep="\t", header=T, row.names=NULL, quote="")
+vst <- read.table("result/salmon_deseq2/ysx.simplier.DESeq2.normalized.vst.txt", sep="\t", header=T, row.names=NULL, quote="")
 
 head(vst)
 combine_vst <- left_join(vst, idmap, by=c("id"="ENSG"))
@@ -224,11 +224,11 @@ head(combine_de)
 
 all_entrez <- combine_de[,c(4,2)]
 all_entrez <- all_entrez[all_entrez$Entrez!="",]
-write.table(all_entrez, file="result/salmon_deseq2/ehbio_salmon.DESeq2.log2fc_ranked.entrez.txt", quote=F, sep="\t", row.names=F, col.names=T)
+write.table(all_entrez, file="result/salmon_deseq2/ysx_salmon.DESeq2.log2fc_ranked.entrez.txt", quote=F, sep="\t", row.names=F, col.names=T)
 
 all_symbol <- combine_de[,c(3,2)]
 all_symbol <- all_symbol[all_symbol[,1] !="", ,drop=F]
-write.table(all_symbol, file="result/salmon_deseq2/ehbio_salmon.DESeq2.log2fc_ranked.symbol.txt", quote=F, sep="\t", row.names=F, col.names=T)
+write.table(all_symbol, file="result/salmon_deseq2/ysx_salmon.DESeq2.log2fc_ranked.symbol.txt", quote=F, sep="\t", row.names=F, col.names=T)
 ```
 
 ### 结果文件描述
@@ -240,31 +240,31 @@ salmon.output
 metadata.txt
 
 # 所有差异基因列表
-ehbio_trans.Count_matrix.xls.DESeq2.all.DE
+ysx_trans.Count_matrix.xls.DESeq2.all.DE
 
 # PCA结果
-ehbio_trans.Count_matrix.xls.DESeq2.normalized.rlog.pca.pdf
+ysx_trans.Count_matrix.xls.DESeq2.normalized.rlog.pca.pdf
 
 # 样品相关性层级聚类结果
-ehbio_trans.Count_matrix.xls.DESeq2.normalized.rlog.pearson.pdf
+ysx_trans.Count_matrix.xls.DESeq2.normalized.rlog.pearson.pdf
 
 # rlog转换后的标准化后的表达结果
-ehbio_trans.Count_matrix.xls.DESeq2.normalized.rlog.xls
+ysx_trans.Count_matrix.xls.DESeq2.normalized.rlog.xls
 
 # 标准化后的表达结果
-ehbio_trans.Count_matrix.xls.DESeq2.normalized.xls
+ysx_trans.Count_matrix.xls.DESeq2.normalized.xls
 
 # 运行脚本
-ehbio_trans.Count_matrix.xls.DESeq2.r
+ysx_trans.Count_matrix.xls.DESeq2.r
 
 # 差异基因结果
-ehbio_trans.Count_matrix.xls.DESeq2.untrt._higherThan_.trt.id.xls
-ehbio_trans.Count_matrix.xls.DESeq2.untrt._higherThan_.trt.xls
-ehbio_trans.Count_matrix.xls.DESeq2.untrt._lowerThan_.trt.id.xls
-ehbio_trans.Count_matrix.xls.DESeq2.untrt._lowerThan_.trt.xls
+ysx_trans.Count_matrix.xls.DESeq2.untrt._higherThan_.trt.id.xls
+ysx_trans.Count_matrix.xls.DESeq2.untrt._higherThan_.trt.xls
+ysx_trans.Count_matrix.xls.DESeq2.untrt._lowerThan_.trt.id.xls
+ysx_trans.Count_matrix.xls.DESeq2.untrt._lowerThan_.trt.xls
 
 # 火山图和火山图输入数据
-ehbio_trans.Count_matrix.xls.DESeq2.untrt._vs_.trt.results.xls
-ehbio_trans.Count_matrix.xls.DESeq2.untrt._vs_.trt.results.xls.volcano.pdf
+ysx_trans.Count_matrix.xls.DESeq2.untrt._vs_.trt.results.xls
+ysx_trans.Count_matrix.xls.DESeq2.untrt._vs_.trt.results.xls.volcano.pdf
 ```
 
