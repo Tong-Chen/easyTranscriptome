@@ -160,7 +160,7 @@ clusterSampleUpperTriPlot(normexpr$vst[1:500,], cor_file=paste(output_prefix, "D
 
 ```{r}
 metadata = as.data.frame(colData(dds))
-sp_pca(normexpr$vst[1:1000,], metadata, color_variable="conditions", shape_variable = "individual") + aes(size=1) + guides(size = "none")
+sp_pca(normexpr$vst[1:2000,], metadata, color_variable="conditions", shape_variable = "individual") + aes(size=1) + guides(size = "none")
 ```
 
 先鉴定出差异基因，获得差异基因文件`STAR.simpler.DESeq2.all.DE.txt`和其它可视化图表（暂时忽略）。

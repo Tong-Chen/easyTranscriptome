@@ -12,6 +12,7 @@
 
 ```
 conda install numpy matplotlib
+pip install numpy matplotlib
 ```
 
 ```{python}

@@ -250,7 +250,8 @@ sp_enrichment("result/GOKEGG_enrichment/ysx.DESeq2.all.DE.symbol.hallmark.all.en
 # 生成网络文件
 library(tidyr)
 enrichFile <- "result/GOKEGG_enrichment/ysx.DESeq2.all.DE.symbol.hallmark.all.enriched.xls"
-enrichTable <- sp_readTable(enrichFile)[,c(11,1)]
+enrichTable <- sp_readTable(enrichFile)[,c("geneID","ID")]
+# enrichTable <- sp_readTable(enrichFile)[,c(8,1)]
 
 head(enrichTable)
 
