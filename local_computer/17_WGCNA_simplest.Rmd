@@ -134,6 +134,7 @@ WGCNA_dataCheck(wgcnaL$datExpr, saveplot=paste0(output_prefix, ".WGCNA_dataCheck
 
 ```{r, fig.width=9, fig.height=7}
 wgcnaL <- WGCNA_dataFilter(wgcnaL, top_mad_n=1)
+?dataFilter
 
 wgcnaL <- WGCNA_sampleClusterDetectOutlier(wgcnaL, traitColors=wgcnaL$traitColors,
                                            thresholdZ.k = -2.5, removeOutlier = T)

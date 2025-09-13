@@ -259,7 +259,7 @@ sp_vennDiagram(all_de, label1="Before_batch_untrt._higherThan_.trt",
                label2="After_known_batch_untrt._higherThan_.trt")
 ```
 
-采用在线工具<http://www.ehbio.com/test/venn/#/> 来做，准备在线工具所需的文件，一个两列格式的文件：第一列为基因名，第二列为基因的上下调状态。拷贝文件数据到网站数据输入处：
+采用在线工具<https://www.bic.ac.cn/Evenn/#/> 来做，准备在线工具所需的文件，一个两列格式的文件：第一列为基因名，第二列为基因的上下调状态。拷贝文件数据到网站数据输入处：
 
 ![](images/venn.gif)
 
@@ -433,7 +433,7 @@ sp_vennDiagram(all_de, label3="Before_batch_untrt._higherThan_.trt",
                label2="After_sva_batch_untrt._higherThan_.trt")
 ```
 
-这里还是采用在线工具<http://www.ehbio.com/test/venn/#/> 来做，能直接获得每个子集的基因，准备在线工具所需的文件，一个两列格式的文件：第一列为基因名，第二列为基因的上下调状态。
+这里还是采用在线工具<https://www.bic.ac.cn/EVenn/#/> 来做，能直接获得每个子集的基因，准备在线工具所需的文件，一个两列格式的文件：第一列为基因名，第二列为基因的上下调状态。
 
 拷贝文件数据到网站数据输入处 （操作就不演示了看上一篇文章）：
 

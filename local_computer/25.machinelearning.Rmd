@@ -16,7 +16,7 @@ output:
 ---
 
 ```{r, echo=F, eval=F}
-rmarkdown::render("35.machinelearning.Rmd", output_format=rmarkdown::md_document(), output_file="35.machinelearning.md")
+rmarkdown::render("25.machinelearning.Rmd", output_format=rmarkdown::md_document(), output_file="35.machinelearning.md")
 ```
 
 
@@ -26,14 +26,17 @@ knitr::opts_chunk$set( echo = TRUE, message=FALSE,
 ```
 
 ```{r}
-site = "https://mirrors.tuna.tsinghua.edu.cn/CRAN"
+# site = "https://mirrors.tuna.tsinghua.edu.cn/CRAN"
+site = "https://mirrors.westlake.edu.cn/CRAN"
 
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager", repos = site)
 
 a = rownames(installed.packages())
 
-options("repos"=c(CRAN="https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
+# options("repos"=c(CRAN="https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
+# options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+options(BioC_mirror="https://mirrors.westlake.edu.cn/bioconductor")
 
 install_bioc <-
   c(
@@ -55,6 +58,8 @@ if (!"ImageGP" %in% a){
 
 library(conflicted)
 conflict_prefer("intersect", "base")
+conflict_prefer("as.matrix", "base")
+conflict_prefer("as.factor", "base")
 ```
 
 
@@ -323,6 +328,7 @@ generateTestVariableSet <- function(num_toal_variable){
 # 提取训练集的特征变量子集
 boruta_train_data <- train_data[, boruta.finalVarsWithTentative$Item]
 boruta_mtry <- generateTestVariableSet(ncol(boruta_train_data))
+boruta_mtry
 ```
 
 使用 Caret 进行调参和建模

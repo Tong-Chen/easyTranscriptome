@@ -4,7 +4,7 @@
     
     # 作者 Authors: 陈同 (Chen Tong)等
     # 版本 Version: v2.0
-    # 更新 Update: 2024-4-18
+    # 更新 Update: 2025-9-13
     # 系统要求 System requirement: Windows 10 / Mac OS 10.12+ / Ubuntu 16.04+ / CentOS
     
     # 1. 这一部分是在远程服务器的Rstudio界面利用远程服务器的计算资源进行的操作。
@@ -124,8 +124,15 @@
     
     # 批量评估，结果输出在 seq 目录下
     fastqc seq/*.fq.gz
-    
     # seq/trt_N061011_1_fastqc.html 在Rstudio中打开 (View in Web browser)
+    
+    # 去除低质量碱基和接头序列
+    # rename 'fq' 'fastq' seq/*.fq.gz
+    # for samp in `tail -n +2 result/metadata.txt | cut -f 1`; do \
+    #   mv seq/{samp}_1.fq.gz seq/${samp}_1.fastq.gz \
+    #   mv seq/{samp}_2.fq.gz seq/${samp}_2.fastq.gz \
+    #   fastp -i seq/${samp}_1.fastq.gz -I seq/${samp}_2.fastq.gz \
+    #         -o seq/{samp}_1.fq.gz -O seq/${samp}_2.fq.gz ; done
     
     # multiqc 整理评估结果
     # -d .: 表示分析当前目录所有文件和文件夹，multiqc会遍历读取，分析每一个文件是不是
@@ -361,14 +368,15 @@
     # ./untrt_N61311/untrt_N61311.salmon.count/quant.sf
     
     # 这个压缩包下载解压到本地
+    # 屏幕上输出的deflated 60%，70%，80%是文件在 zip 压缩时的压缩率，忽略就好
     (cd result; zip quant.sf.zip `find . -name quant.sf`)
     
     # 生成一个两列文件方便R导入
     # xargs接收上一步的输出，按批次提供给下游程序作为输入
     # -i: 用{}表示传递的值
     # cut -f 1 result/metadata.txt | xargs -i echo -e "{}\t{}/{}.salmon.count/quant.sf" >salmon.output
-    awk 'BEGIN{OFS=FS="\t"}{print $1"\t"$1"/"$1".salmon.count/quant.sf"}' result/metadata.txt >result/salmon.output
-    head result/salmon.output
+    awk 'BEGIN{OFS=FS="\t"}{print $1"\t"$1"/"$1".salmon.count/quant.sf"}' result/metadata.txt >result/salmon.output.txt
+    head result/salmon.output.txt
     # Samp    Samp/Samp.salmon.count/quant.sf
     # untrt_N61311    untrt_N61311/untrt_N61311.salmon.count/quant.sf
     # untrt_N052611   untrt_N052611/untrt_N052611.salmon.count/quant.sf
@@ -501,7 +509,7 @@
     
   
     # mkdir新建目录
-    # -p: 表示目录不存在则新建；存在则不做认可事情 
+    # -p: 表示目录不存在则新建；存在则不任何事情 
     mkdir -p result/trt_N061011
     # --runThreadN 4: 使用4个线程
     # --readFilesIn: 输入文件，左端和右端
@@ -638,7 +646,7 @@
     #### Reads比对到基因组标志性区域的分布
     #
     ## 请完成堆积柱状图的绘制
-    ## 或使用www.ehbio.com/ImageGP
+    ## 或使用www.ysx.com/ImageGP
     read_distribution.py -i result/trt_N061011/trt_N061011.Aligned.sortedByCoord.out.bam \
         -r ${db}/Genome.gtf.bed12 >result/trt_N061011/trt_N061011.read_distrib.xls
     #
@@ -759,20 +767,20 @@
 ## 3.4  合并STAR 比对结果获得 Count 矩阵
     
     # 基因reads count增加样品信息，方便后续合并        
-    # sed '5 i\Gene\ttrt_N061011\ttrt_N061011\ttrt_N061011' trt_N061011/trt_N061011.ReadsPerGene.out.tab trt_N061011/trt_N061011.ReadsPerGene.out.tab.ehbio
+    # sed '5 i\Gene\ttrt_N061011\ttrt_N061011\ttrt_N061011' trt_N061011/trt_N061011.ReadsPerGene.out.tab trt_N061011/trt_N061011.ReadsPerGene.out.tab.ysx
     
     for i in `tail -n +2 result/metadata.txt | cut -f 1`; do 
         sed "5 i\Gene\t${i}\t${i}\t${i}" result/${i}/${i}.ReadsPerGene.out.tab \
-          >result/${i}/${i}.ReadsPerGene.out.tab.ehbio
+          >result/${i}/${i}.ReadsPerGene.out.tab.ysx
     done
     
     
     # Linux 命令合并
-    paste `find . -name *.ReadsPerGene.out.tab.ehbio` | tail -n +5 | \
+    paste `find . -name *.ReadsPerGene.out.tab.ysx` | tail -n +5 | \
         awk 'BEGIN{OFS=FS="\t" }{line=$1; \
         for(i=2;i<=NF;i++) if(i%2==0 && i%4!=0) line=line"\t"$i; print line;}' \
-        >result/ehbio_trans.Count_matrix.xls
-    head result/ehbio_trans.Count_matrix.xls
+        >result/ysx_trans.Count_matrix.xls
+    head result/ysx_trans.Count_matrix.xls
     
     
     
@@ -815,7 +823,7 @@
     # -o: 输出文件
     # mergeList.txt：单个样品GTF列表，每个一行
     
-    stringtie --merge -G ${db}/Genome.gtf -l ehbio_trans -o result/ehbio_trans.gtf result/mergeList.txt
+    stringtie --merge -G ${db}/Genome.gtf -l ysx_trans -o result/ysx_trans.gtf result/mergeList.txt
     
     
     #新拼装转录本与原基因组注释转录本比较 (可用来筛选新转录本)
@@ -824,14 +832,14 @@
     # -r: reference gtf
     # -o: 输出前缀
     
-    gffcompare -R -r ${db}/Genome.gtf -o result/assembeCompare2Ref result/ehbio_trans.gtf
+    gffcompare -R -r ${db}/Genome.gtf -o result/assembeCompare2Ref result/ysx_trans.gtf
     # 会输出一个assembeCompare2Ref.annotated.gtf，用于后续的定量
     
     head result/assembeCompare2Ref.annotated.gtf
     
     统计不同种类转录本的数目
     
-    cut -f 3 result/assembeCompare2Ref.ehbio_trans.gtf.tmap | tail -n +2 | sort | uniq -c
+    cut -f 3 result/assembeCompare2Ref.ysx_trans.gtf.tmap | tail -n +2 | sort | uniq -c
     
 ## 4.5  新参考基因集定量 (HTSeq)
 
@@ -852,10 +860,10 @@
     paste `find . -name *.readsCount2` | \
         awk 'BEGIN{OFS=FS="\t" }{line=$1; \
         for(i=2;i<=NF;i++) if(i%2==0) line=line"\t"$i; print line;}' \
-        >result/ehbio_trans.Count_matrix2.xls
-    head result/ehbio_trans.Count_matrix2.xls
+        >result/ysx_trans.Count_matrix2.xls
+    head result/ysx_trans.Count_matrix2.xls
     
-    tail result/ehbio_trans.Count_matrix2.xls
+    tail result/ysx_trans.Count_matrix2.xls
     
 ## 4.6 新参考基因集定量 (Salmon)
     
@@ -957,7 +965,7 @@
     
     # 统计不同种类转录本的数目
     
-    cut -f 3 result/assembeCompare2Ref.ehbio_trans.gtf.tmap | tail -n +2 | sort | uniq -c
+    cut -f 3 result/assembeCompare2Ref.ysx_trans.gtf.tmap | tail -n +2 | sort | uniq -c
     
     # 获取所有转录本的序列
     mkdir -p result2
@@ -987,8 +995,8 @@
     paste `find . -name quant2.sf` | \
         awk 'BEGIN{OFS=FS="\t" }{line=$1; \
         for(i=2;i<=NF;i++) if(i%2==0) line=line"\t"$i; print line;}' \
-        >result2/ehbio_trans.TPM.xls
-    head result2/ehbio_trans.TPM.xls
+        >result2/ysx_trans.TPM.xls
+    head result2/ysx_trans.TPM.xls
     
     # 生成转录本和Gene symbol的对应关系
     
@@ -1092,7 +1100,7 @@
     
     # Correlation 
     awk 'BGEIN{OFS=FS="\t"}ARGIND==1{a[$2]=1;}ARGIND==2{if(FNR==1 || a[$1]==1) print $0}' \
-          result2/miRNA_sponge.list.id result2/ehbio_trans.TPM.xls >result2/miRNA_sponge.list.expr
+          result2/miRNA_sponge.list.id result2/ysx_trans.TPM.xls >result2/miRNA_sponge.list.expr
     
     head result2/miRNA_sponge.list.expr
     

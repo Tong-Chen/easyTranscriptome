@@ -141,7 +141,7 @@ normalizedExpr2DistribBoxplot(normexpr)
 #                     saveplot=paste(output_prefix, "DESeq2.sampleCorrelation.pdf", sep="."))
 # 如果出现figure margins too large; 把下面代码拷贝到左下角console里面，回车运行即可
 # 是因为屏幕太小了，图输出不全导致的。
-clusterSampleHeatmap2(normexpr$vst[1:500,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
+clusterSampleHeatmap2(normexpr$vst[1:5000,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
 clusterSampleUpperTriPlot(normexpr$vst[1:1000,], cor_file=paste(output_prefix, "DESeq2.sampleCorrelation.txt", sep="."))
 ```
 
