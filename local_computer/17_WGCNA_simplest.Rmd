@@ -194,7 +194,7 @@ geneTraitCor <- WGCNA_ModuleGeneTraitHeatmap(wgcnaL$datExpr, traitData=wgcnaL$tr
 
 
 ```{r}
-cyt <- WGCNA_cytoscape(net, power, wgcnaL$datExpr, prefix=output_prefix)
+cyt <- WGCNA_cytoscape(net, power, wgcnaL$datExpr, prefix=output_prefix, correlation_threshold = 0.3)
 
 hubgene <- WGCNA_hubgene(cyt, top_hub_n=20, prefix=output_prefix)
 

@@ -33,6 +33,10 @@
 
     # 下载conda（下载失败可以去QQ群文件Linux文件夹下载）
     wget -c https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    
+    # mac
+    curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh
+    
     bash Miniconda3-latest-Linux-x86_64.sh -b -f
     
     # 如果是从QQ群下载miniconda，下载后，放到c盘根目录下
@@ -120,13 +124,14 @@
 2. 安装转录组分析所需所有软件
 
         #注意： conda安装的samtools不能使用samtools tview, 需要自己重新编译安装
-        conda create -y -n transcriptome python=3.6 r=4.1.0
+        conda create -y -n transcriptome 
         conda activate transcriptome
     
         # source ~/miniconda3/bin/activate transcriptome
         # conda安装时注意顺序
         conda install -y samtools multiqc fastqc star 
         conda install -y stringtie trimmomatic
+        conda install -y python=3.12
         conda install -y rmats
         # 注意h5py的版本
         # conda install -y h5py=2.10.0 rnasamba
@@ -135,7 +140,20 @@
         conda install -y bedtools htseq
         conda install -y rmats2sashimiplot
         conda install -y gffread
-        conda install -y ucsc-bedsort ucltrsc-bedgraphtobigwig ucsc-gtftogenepred ucsc-genepredtobed
+        conda install -y ucsc-bedsort ucsc-bedgraphtobigwig ucsc-gtftogenepred ucsc-genepredtobed
+        
+        conda install bioconda::megahit
+        
+        mv /mnt/d/salmon-1.10.0_linux_x86_64.tar.gz .
+        tar -xvzf salmon-1.10.0_linux_x86_64.tar.gz
+        ./salmon-latest_linux_x86_64/bin/salmon
+        
+        ln -fs `pwd`/salmon-latest_linux_x86_64/bin/salmon ~/miniconda3/envs/transcriptome/bin/
+        
+        salmon
+        
+        
+        
 
 ## 安装其它软件和脚本 (每种方法都必须要安装的)
 
