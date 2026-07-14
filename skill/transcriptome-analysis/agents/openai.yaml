@@ -1,0 +1,4 @@
+interface:
+  display_name: "转录组分析"
+  short_description: "验证 metadata 并完成定量、差异分析和结果验收"
+  default_prompt: "Use $transcriptome-analysis to validate my required metadata and prepare a safe RNA-seq analysis run."
